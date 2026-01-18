@@ -4,7 +4,7 @@ import tseslint from 'typescript-eslint';
 export default tseslint.config(
   // Ignores
   {
-    ignores: ['dist/**', 'node_modules/**', 'homebridge-ui/**', 'test/**', 'scripts/**'],
+    ignores: ['dist/**', 'node_modules/**', 'homebridge-ui/**', 'test/**', 'scripts/**', 'tmp/**'],
   },
   // Base recommended configs (must come before custom rules)
   eslint.configs.recommended,
