@@ -1,0 +1,448 @@
+{
+  "sm_destination": "62",
+  "message_pattern": {
+    "sop_preamble": {
+      "constant": "ab",
+      "start": 0,
+      "end": 1
+    },
+    "src": {
+      "constant": "03",
+      "start": 1,
+      "end": 2
+    },
+    "destination": {
+      "start": 2,
+      "end": 4
+    },
+    "opcode": {
+      "start": 4,
+      "end": 5
+    },
+    "data_length": {
+      "start": 5,
+      "end": 7
+    },
+    "checksum": {
+      "constant": "checksum",
+      "length": 2
+    }
+  },
+  "commands": {
+    "timezone": {
+      "init": 0,
+      "ondemand": false,
+      "opcode": "c2",
+      "destination": "FFFE",
+      "shadow_dest": "SM",
+      "pkfNeeded": false,
+      "data": {
+        "request_length": 2,
+        "response_length": 0
+      }
+    },
+    "real_time_clock": {
+      "init": 1,
+      "ondemand": false,
+      "opcode": "09",
+      "destination": "FFF9",
+      "pkfNeeded": false,
+      "data": {
+        "request_length": 4,
+        "response_length": 0
+      }
+    },
+    "get_sm_data": {
+      "init": 2,
+      "ondemand": true,
+      "opcode": "02",
+      "destination": "FFFD",
+      "pkfNeeded": false,
+      "need_to_collect_data": true,
+      "data": {
+        "request_length": 3,
+        "response_length": 256,
+        "map": {
+          "timezone": {
+            "data_type": "bits",
+            "start": 63,
+            "end": 65
+          },
+          "quick_features": {
+            "data_type": "bits",
+            "start": 65,
+            "end": 66
+          },
+          "pws_sw_version": {
+            "data_type": "bits",
+            "start": 38,
+            "end": 42
+          },
+          "weekly": {
+            "data_type": "bits",
+            "start": 72,
+            "end": 108
+          },
+          "trigger_by": {
+            "data_type": "int",
+            "start": 213,
+            "end": 214
+          },
+          "delay": {
+            "data_type": "bits",
+            "start": 108,
+            "end": 114
+          },
+          "cycle_times": {
+            "data_type": "bits",
+            "start": 217,
+            "end": 237
+          },
+          "wifi_ssid": {
+            "data_type": "bits",
+            "start": 118,
+            "end": 151
+          }
+        }
+      }
+    },
+    "system_status": {
+      "init": 4,
+      "ondemand": true,
+      "opcode": "07",
+      "destination": "FFF8",
+      "shadow_dest": "AWS",
+      "pkfNeeded": false,
+      "need_to_collect_data": true,
+      "data": {
+        "request_length": 0,
+        "response_length": 53,
+        "map": {
+          "filter_state": {
+            "data_type": "hex",
+            "start": 2,
+            "end": 2
+          },
+          "cleaning_mode": {
+            "data_type": "hex",
+            "start": 3,
+            "end": 3
+          },
+          "cycle_info": {
+            "data_type": "bits",
+            "start": 4,
+            "end": 13
+          },
+          "is_smart": {
+            "data_type": "bool",
+            "start": 14,
+            "end": 14
+          },
+          "next_cycle_info": {
+            "data_type": "bits",
+            "start": 15,
+            "end": 17
+          },
+          "mu_state": {
+            "data_type": "hex",
+            "start": 0,
+            "end": 0
+          },
+          "sm_state": {
+            "data_type": "hex",
+            "start": 1,
+            "end": 1
+          },
+          "faults": {
+            "data_type": "hex",
+            "start": 18,
+            "end": 29
+          },
+          "cleaning_modes": {
+            "data_type": "hex",
+            "start": 30,
+            "end": 52
+          }
+        }
+      }
+    },
+    "pws_features": {
+      "init": 5,
+      "ondemand": false,
+      "opcode": "1a",
+      "destination": "FFFA",
+      "pkfNeeded": false,
+      "data": {
+        "request_length": 0,
+        "response_length": 3,
+        "map": {
+          "network_sensing": {
+            "data_type": "bool",
+            "start": 0,
+            "end": 1
+          },
+          "inwat": {
+            "data_type": "bool",
+            "start": 1,
+            "end": 2
+          },
+          "cellular": {
+            "data_type": "bool",
+            "start": 2,
+            "end": 3
+          },
+          "ota": {
+            "data_type": "bool",
+            "start": 3,
+            "end": 4
+          },
+          "psc": {
+            "data_type": "bool",
+            "start": 4,
+            "end": 5
+          }
+        }
+      }
+    },
+    "cloud_connection_status": {
+      "init": 6,
+      "ondemand": true,
+      "opcode": "df",
+      "destination": "FFFE",
+      "pkfNeeded": false,
+      "data": {
+        "request_length": 0,
+        "response_length": 1,
+        "map": {
+          "error_type": {
+            "data_type": "hex",
+            "start": 0,
+            "end": 0
+          }
+        }
+      }
+    },
+    "temperature": {
+      "init": 7,
+      "ondemand": true,
+      "opcode": "09",
+      "destination": "FFF8",
+      "shadow_dest": "AWS",
+      "pkfNeeded": true,
+      "data": {
+        "request_length": 0,
+        "response_length": 10,
+        "map": {
+          "inwat_status": {
+            "data_type": "hex",
+            "start": 0,
+            "end": 0
+          },
+          "temperature": {
+            "data_type": "int16",
+            "start": 1,
+            "end": 2
+          },
+          "mesuring_during_cycle": {
+            "data_type": "hex",
+            "start": 3,
+            "end": 3
+          },
+          "measuringStatus": {
+            "data_type": "hex",
+            "start": 4,
+            "end": 4
+          },
+          "timestamp": {
+            "data_type": "hex",
+            "start": 5,
+            "end": 9
+          }
+        }
+      }
+    },
+    "start_up_dolphin": {
+      "init": -1,
+      "ondemand": false,
+      "opcode": "06",
+      "destination": "FFF8",
+      "pkfNeeded": false,
+      "data": {
+        "request_length": 0,
+        "response_length": 0
+      }
+    },
+    "shutdown_dolphin": {
+      "init": -1,
+      "ondemand": false,
+      "opcode": "05",
+      "destination": "FFF8",
+      "pkfNeeded": false,
+      "data": {
+        "request_length": 0,
+        "response_length": 0
+      }
+    },
+    "set_cleaning_mode": {
+      "init": -1,
+      "ondemand": false,
+      "opcode": "03",
+      "destination": "FFE9",
+      "pkfNeeded": false,
+      "data": {
+        "request_length": 1,
+        "response_length": 0
+      }
+    },
+    "set_cycle_time": {
+      "init": -1,
+      "ondemand": false,
+      "opcode": "01",
+      "destination": "FFE9",
+      "pkfNeeded": false,
+      "data": {
+        "request_length": 2,
+        "response_length": 0
+      }
+    },
+    "set_delay_time": {
+      "init": -1,
+      "ondemand": false,
+      "opcode": "46",
+      "destination": "FFF9",
+      "pkfNeeded": false,
+      "data": {
+        "request_length": 6,
+        "response_length": 0
+      }
+    },
+    "set_weekly_timer": {
+      "init": -1,
+      "ondemand": false,
+      "opcode": "45",
+      "destination": "FFF9",
+      "pkfNeeded": false,
+      "data": {
+        "request_length": 25,
+        "response_length": 0
+      }
+    },
+    "reset_filter_indicator": {
+      "init": -1,
+      "ondemand": false,
+      "opcode": "0a",
+      "destination": "FFF7",
+      "pkfNeeded": false,
+      "data": {
+        "request_length": 0,
+        "response_length": 0
+      }
+    },
+    "manual_drive": {
+      "init": -1,
+      "ondemand": false,
+      "opcode": "03",
+      "destination": "FFF7",
+      "pkfNeeded": false,
+      "data": {
+        "request_length": 2,
+        "response_length": 0
+      }
+    },
+    "quit_manual_drive": {
+      "init": -1,
+      "ondemand": false,
+      "opcode": "04",
+      "destination": "FFF7",
+      "pkfNeeded": false,
+      "data": {
+        "request_length": 0,
+        "response_length": 0
+      }
+    }
+  },
+  "acknowledge": {
+    "fffd": {
+      "00": "success",
+      "01": "rc_crc_error",
+      "02": "uart_robot_send_error",
+      "03": "packet_sent_to_soon",
+      "04": "invalid_cmd",
+      "05": "robot_ack_timeout",
+      "06": "robot_bad_csm"
+    },
+    "fff9": {
+      "50": "robot_ack",
+      "51": "robot_nack",
+      "00": "success",
+      "01": "crc_error",
+      "03": "packet_sent_to_Soon",
+      "04": "invalid_cmd",
+      "05": "robot_ack_timeout",
+      "08": "robot_none_ack2",
+      "09": "robot_ack_bad_cms2",
+      "0A": "wait",
+      "0B": "failed_write_flash",
+      "0C": "invalid_data"
+    },
+    "fffa": {
+      "00": "success",
+      "02": "wrg_Param",
+      "03": "error",
+      "04": "flash_Err",
+      "05": "timeout"
+    },
+    "fff8": {
+      "00": "success"
+    },
+    "ffe9": {
+      "00": "success"
+    },
+    "fff7": {
+      "00": "success",
+      "01": "crc_error",
+      "02": "invalid_instruction",
+      "08": "ack_timeout",
+      "D7": "filter_status"
+    },
+    "fffe": {
+      "00": "success",
+      "01": "rc_crc_error",
+      "02": "no_wifi_signal",
+      "03": "cant_connect_to_network",
+      "04": "cant_connect_to_cloud",
+      "07": "pws_ip_address"
+    }
+  },
+  "robot_properties": {
+    "cleaning_modes": {
+      "stairs": 120,
+      "regular": 120,
+      "short": 60,
+      "cove": 120,
+      "floor": 120,
+      "water": 120,
+      "ultra": 120,
+      "spot": 120,
+      "wall": 120,
+      "tictac": 600,
+      "custom": 120,
+      "pickup": 5
+    }
+  },
+  "topics": {
+    "subscribe_topics": [
+      "$aws/things/%@/shadow/update/accepted",
+      "$aws/things/%@/shadow/update/rejected",
+      "$aws/things/%@/shadow/get/accepted",
+      "$aws/things/%@/shadow/get/rejected"
+    ],
+    "get_data_topics": ["$aws/things/%@/shadow/get"],
+    "subscribe_dynamic_topic": ["Maytronics/%@/main"],
+    "send_channels": {
+      "dynamic_channel": "Maytronics/%@/main",
+      "regular_channel": "$aws/things/%@/shadow/get",
+      "update_channel": "$aws/things/%@/shadow/update"
+    }
+  }
+}

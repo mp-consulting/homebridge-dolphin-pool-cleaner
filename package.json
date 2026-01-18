@@ -1,0 +1,64 @@
+{
+  "name": "@mp-consulting/homebridge-dolphin-pool-cleaner",
+  "version": "1.0.0",
+  "description": "Homebridge plugin for MyDolphin Plus pool cleaning robots (Maytronics)",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "rimraf ./dist && tsc && npm run copy-assets",
+    "copy-assets": "mkdir -p ./dist/protocol && cp ./src/protocol/*.json ./dist/protocol/",
+    "lint": "eslint . --max-warnings=0",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "watch": "npm run build && npm link && nodemon",
+    "prepublishOnly": "npm run lint && npm run build"
+  },
+  "keywords": [
+    "homebridge-plugin",
+    "homebridge",
+    "mydolphin",
+    "maytronics",
+    "dolphin",
+    "pool",
+    "robot",
+    "cleaner",
+    "pool-cleaner"
+  ],
+  "author": "Mickael",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0",
+    "homebridge": ">=1.6.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mickael/homebridge-dolphin-pool-cleaner.git"
+  },
+  "homepage": "https://github.com/mickael/homebridge-dolphin-pool-cleaner#readme",
+  "dependencies": {
+    "@aws-sdk/client-cognito-identity-provider": "^3.540.0",
+    "@aws-sdk/client-iot": "^3.971.0",
+    "@homebridge/plugin-ui-utils": "^1.0.3",
+    "axios": "^1.6.0",
+    "mqtt": "^5.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.30",
+    "@vitest/coverage-v8": "^4.0.17",
+    "eslint": "^9.0.0",
+    "homebridge": "^2.0.0-beta.0",
+    "nodemon": "^3.1.0",
+    "prettier": "^3.8.0",
+    "rimraf": "^6.0.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.53.0",
+    "vitest": "^4.0.17"
+  },
+  "homebridge": {
+    "pluginAlias": "DolphinPoolCleaner",
+    "pluginType": "platform",
+    "singular": true,
+    "customUi": true
+  }
+}

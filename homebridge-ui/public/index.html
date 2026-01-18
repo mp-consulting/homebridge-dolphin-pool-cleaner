@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dolphin Pool Cleaner Setup</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="wizard-container">
+    <!-- Step 0: Configured Robots (shown when config exists) -->
+    <div id="step-configured" class="wizard-step">
+      <div class="step-header">
+        <div class="step-icon">🐬</div>
+        <h2>Your Dolphin Robots</h2>
+        <p class="step-description">Manage your configured pool robots</p>
+      </div>
+
+      <div id="configured-robots-list">
+        <!-- Robot cards will be inserted here by JavaScript -->
+      </div>
+
+      <div class="button-group">
+        <button type="button" class="btn btn-secondary" id="add-robot-btn">Add Another Robot</button>
+        <button type="button" class="btn btn-primary" id="reconfigure-btn">Reconfigure</button>
+      </div>
+    </div>
+
+    <!-- Step 1: Login (Email only for CUSTOM_AUTH) -->
+    <div id="step-login" class="wizard-step active">
+      <div class="step-header">
+        <div class="step-icon">🐬</div>
+        <h2>Connect Your MyDolphin Account</h2>
+        <p class="step-description">Enter your MyDolphin Plus email address. A verification code will be sent to you.</p>
+      </div>
+
+      <form id="login-form">
+        <div class="form-group">
+          <label for="email">Email</label>
+          <input type="email" id="email" name="email" placeholder="your@email.com" required>
+          <small class="help-text">The email associated with your MyDolphin Plus account</small>
+        </div>
+
+        <div id="login-error" class="error-message" style="display: none;"></div>
+
+        <div class="button-group">
+          <button type="submit" class="btn btn-primary" id="login-btn">
+            <span class="btn-text">Send Verification Code</span>
+            <span class="btn-loading" style="display: none;">Sending...</span>
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Step 1b: OTP Verification -->
+    <div id="step-otp" class="wizard-step">
+      <div class="step-header">
+        <div class="step-icon">🔐</div>
+        <h2>Verification Required</h2>
+        <p class="step-description" id="otp-message">Please enter the verification code sent to your email.</p>
+      </div>
+
+      <form id="otp-form">
+        <div class="form-group">
+          <label for="otp-code">Verification Code</label>
+          <input type="text" id="otp-code" name="otpCode" placeholder="Enter code" required
+                 autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]*" maxlength="6">
+          <small class="help-text">Check your email or phone for the verification code</small>
+        </div>
+
+        <div id="otp-error" class="error-message" style="display: none;"></div>
+
+        <div class="button-group">
+          <button type="button" class="btn btn-secondary" id="otp-back-btn">Back</button>
+          <button type="submit" class="btn btn-primary" id="otp-btn">
+            <span class="btn-text">Verify</span>
+            <span class="btn-loading" style="display: none;">Verifying...</span>
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Step 2: Robot Found -->
+    <div id="step-robot" class="wizard-step">
+      <div class="step-header">
+        <div class="step-icon success">✓</div>
+        <h2>Robot Found!</h2>
+        <p class="step-description">We found your Dolphin pool robot.</p>
+      </div>
+
+      <!-- Robot Card with Image -->
+      <div class="robot-card">
+        <div class="robot-image-container">
+          <!-- Actual robot image from Maytronics API (hidden by default) -->
+          <img id="robot-image"
+               src=""
+               alt="Dolphin Pool Robot"
+               class="robot-image"
+               style="display: none;"
+               onerror="this.style.display='none'; document.getElementById('robot-svg-container').style.display='block';">
+          <!-- SVG Robot Illustration (shown by default, hidden when real image loads) -->
+          <div id="robot-svg-container" class="robot-svg">
+            <svg viewBox="0 0 200 160" xmlns="http://www.w3.org/2000/svg">
+              <!-- Pool Robot Body -->
+              <defs>
+                <linearGradient id="bodyGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" style="stop-color:#4A90D9;stop-opacity:1" />
+                  <stop offset="100%" style="stop-color:#2E5A8B;stop-opacity:1" />
+                </linearGradient>
+                <linearGradient id="topGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" style="stop-color:#5BA0E9;stop-opacity:1" />
+                  <stop offset="100%" style="stop-color:#4A90D9;stop-opacity:1" />
+                </linearGradient>
+                <linearGradient id="wheelGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" style="stop-color:#333;stop-opacity:1" />
+                  <stop offset="100%" style="stop-color:#111;stop-opacity:1" />
+                </linearGradient>
+              </defs>
+
+              <!-- Shadow -->
+              <ellipse cx="100" cy="145" rx="70" ry="8" fill="rgba(0,0,0,0.15)"/>
+
+              <!-- Wheels/Tracks -->
+              <rect x="25" y="100" width="30" height="40" rx="8" fill="url(#wheelGradient)"/>
+              <rect x="145" y="100" width="30" height="40" rx="8" fill="url(#wheelGradient)"/>
+
+              <!-- Track details -->
+              <line x1="30" y1="108" x2="50" y2="108" stroke="#444" stroke-width="2"/>
+              <line x1="30" y1="116" x2="50" y2="116" stroke="#444" stroke-width="2"/>
+              <line x1="30" y1="124" x2="50" y2="124" stroke="#444" stroke-width="2"/>
+              <line x1="30" y1="132" x2="50" y2="132" stroke="#444" stroke-width="2"/>
+              <line x1="150" y1="108" x2="170" y2="108" stroke="#444" stroke-width="2"/>
+              <line x1="150" y1="116" x2="170" y2="116" stroke="#444" stroke-width="2"/>
+              <line x1="150" y1="124" x2="170" y2="124" stroke="#444" stroke-width="2"/>
+              <line x1="150" y1="132" x2="170" y2="132" stroke="#444" stroke-width="2"/>
+
+              <!-- Main Body -->
+              <path d="M40 120 Q40 70 100 60 Q160 70 160 120 L160 130 Q160 140 150 140 L50 140 Q40 140 40 130 Z" fill="url(#bodyGradient)"/>
+
+              <!-- Top Cover -->
+              <ellipse cx="100" cy="75" rx="55" ry="25" fill="url(#topGradient)"/>
+
+              <!-- Handle -->
+              <path d="M70 55 Q100 35 130 55" stroke="#3A80C9" stroke-width="6" fill="none" stroke-linecap="round"/>
+
+              <!-- Filter compartment line -->
+              <path d="M55 90 Q100 100 145 90" stroke="#3A80C9" stroke-width="2" fill="none"/>
+
+              <!-- Status LED -->
+              <circle cx="100" cy="75" r="6" fill="#4ADE80">
+                <animate attributeName="opacity" values="1;0.5;1" dur="2s" repeatCount="indefinite"/>
+              </circle>
+
+              <!-- Maytronics style stripes -->
+              <path d="M60 100 L60 125" stroke="#5BA0E9" stroke-width="3"/>
+              <path d="M75 95 L75 130" stroke="#5BA0E9" stroke-width="3"/>
+              <path d="M125 95 L125 130" stroke="#5BA0E9" stroke-width="3"/>
+              <path d="M140 100 L140 125" stroke="#5BA0E9" stroke-width="3"/>
+
+              <!-- Front brush indicator -->
+              <rect x="45" y="135" width="110" height="6" rx="3" fill="#2E5A8B"/>
+            </svg>
+          </div>
+          <div id="robot-image-fallback" class="robot-image-fallback" style="display: none;">
+            <span class="robot-emoji">🐬</span>
+          </div>
+          <div class="robot-status-badge">
+            <span class="status-dot green"></span>
+            <span>Connected</span>
+          </div>
+        </div>
+        <div class="robot-card-content">
+          <h3 id="robot-name" class="robot-card-name">Dolphin Robot</h3>
+          <div class="robot-card-details">
+            <div class="robot-detail-item">
+              <span class="detail-label">Serial Number</span>
+              <span class="detail-value" id="robot-serial">-</span>
+            </div>
+            <div class="robot-detail-item">
+              <span class="detail-label">Model</span>
+              <span class="detail-value" id="robot-model">Dolphin M400</span>
+            </div>
+            <div class="robot-detail-item">
+              <span class="detail-label">Device Type</span>
+              <span class="detail-value" id="robot-device-type">IoT Connected</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="options-section">
+        <h4>Options</h4>
+
+        <div class="form-group">
+          <label for="display-name">Display Name</label>
+          <input type="text" id="display-name" placeholder="My Pool Robot">
+          <small class="help-text">Name shown in HomeKit</small>
+        </div>
+
+        <div class="form-group">
+          <label for="cleaning-mode">Default Cleaning Mode</label>
+          <select id="cleaning-mode">
+            <option value="all" selected>All Surfaces - Full pool cleaning (floor + walls + waterline)</option>
+            <option value="floor">Floor Only - Cleans just the pool bottom</option>
+            <option value="wall">Walls Only - Cleans vertical surfaces</option>
+            <option value="water">Waterline - Cleans along the water surface line</option>
+            <option value="short">Short/Fast - Quick cleaning cycle</option>
+            <option value="ultra">Ultra Clean - Intensive deep cleaning</option>
+            <option value="cove">Cove - Focuses on corners where floor meets walls</option>
+            <option value="spot">Spot - Concentrated cleaning in a specific area</option>
+            <option value="regular">Regular - Standard cleaning cycle (legacy)</option>
+          </select>
+          <small class="help-text">Mode used when starting cleaning from HomeKit</small>
+        </div>
+
+        <div id="cleaning-mode-info" class="mode-info-box">
+          <div class="mode-info-header">
+            <span class="mode-info-icon">ℹ️</span>
+            <span class="mode-info-title">Mode Details</span>
+          </div>
+          <div id="mode-description" class="mode-info-content">
+            Full pool cleaning covering floor, walls, and waterline. Most thorough cleaning option.
+          </div>
+          <div id="mode-duration" class="mode-info-duration">
+            <span class="duration-icon">⏱️</span>
+            <span id="mode-duration-text">Duration: ~150 minutes</span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="polling-interval">Polling Interval</label>
+          <select id="polling-interval">
+            <option value="30">30 seconds</option>
+            <option value="60" selected>60 seconds (Recommended)</option>
+            <option value="120">2 minutes</option>
+            <option value="300">5 minutes</option>
+          </select>
+          <small class="help-text">How often to check robot status</small>
+        </div>
+
+        <div class="form-group checkbox-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="enable-temperature" checked>
+            <span>Enable Water Temperature Sensor</span>
+          </label>
+        </div>
+
+        <div class="form-group checkbox-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="enable-filter" checked>
+            <span>Enable Filter Status</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="button-group">
+        <button type="button" class="btn btn-secondary" id="back-btn">Back</button>
+        <button type="button" class="btn btn-primary" id="save-btn">Save Configuration</button>
+      </div>
+    </div>
+
+    <!-- Step 3: Success -->
+    <div id="step-success" class="wizard-step">
+      <div class="step-header">
+        <div class="step-icon success">✓</div>
+        <h2>Setup Complete!</h2>
+        <p class="step-description">Your Dolphin pool robot has been configured.</p>
+      </div>
+
+      <div class="success-message">
+        <p>Your robot will now appear in HomeKit. You can:</p>
+        <ul>
+          <li>Turn cleaning on/off with the switch</li>
+          <li>View water temperature</li>
+          <li>Check filter status</li>
+          <li>Use Siri voice commands</li>
+        </ul>
+      </div>
+
+      <div class="button-group">
+        <button type="button" class="btn btn-primary" id="done-btn">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="wizard.js"></script>
+</body>
+</html>

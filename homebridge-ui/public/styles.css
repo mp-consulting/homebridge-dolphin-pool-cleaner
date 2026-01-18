@@ -1,0 +1,580 @@
+/**
+ * Dolphin Pool Cleaner Setup Wizard Styles
+ */
+
+:root {
+  --primary-color: #007aff;
+  --primary-hover: #0056b3;
+  --success-color: #28a745;
+  --error-color: #dc3545;
+  --text-color: #333;
+  --text-muted: #6c757d;
+  --bg-color: #fff;
+  --bg-secondary: #f8f9fa;
+  --border-color: #dee2e6;
+  --input-border: #ced4da;
+  --border-radius: 8px;
+  --shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Dark mode */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --text-color: #e9ecef;
+    --text-muted: #adb5bd;
+    --bg-color: #1a1a1a;
+    --bg-secondary: #2d2d2d;
+    --border-color: #444;
+    --input-border: #555;
+    --shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  }
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  line-height: 1.6;
+}
+
+.wizard-container {
+  max-width: 500px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.wizard-step {
+  display: none;
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+.wizard-step.active {
+  display: block;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Step Header */
+.step-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.step-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.step-icon.success {
+  color: var(--success-color);
+  background: rgba(40, 167, 69, 0.1);
+  width: 80px;
+  height: 80px;
+  line-height: 80px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.step-header h2 {
+  font-size: 24px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.step-description {
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+/* Form Styles */
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  font-weight: 500;
+  margin-bottom: 6px;
+  font-size: 14px;
+}
+
+.form-group input[type="text"],
+.form-group input[type="email"],
+.form-group input[type="password"],
+.form-group select {
+  width: 100%;
+  padding: 12px 14px;
+  font-size: 16px;
+  border: 1px solid var(--input-border);
+  border-radius: var(--border-radius);
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15);
+}
+
+.form-group .help-text {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* Checkbox */
+.checkbox-group {
+  margin-bottom: 12px;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-weight: normal;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--primary-color);
+}
+
+/* Error Message */
+.error-message {
+  background-color: rgba(220, 53, 69, 0.1);
+  color: var(--error-color);
+  padding: 12px 16px;
+  border-radius: var(--border-radius);
+  margin-bottom: 20px;
+  font-size: 14px;
+}
+
+/* Buttons */
+.button-group {
+  display: flex;
+  gap: 12px;
+  margin-top: 30px;
+}
+
+.btn {
+  flex: 1;
+  padding: 14px 20px;
+  font-size: 16px;
+  font-weight: 500;
+  border: none;
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.1s;
+}
+
+.btn:active {
+  transform: scale(0.98);
+}
+
+.btn-primary {
+  background-color: var(--primary-color);
+  color: #fff;
+}
+
+.btn-primary:hover {
+  background-color: var(--primary-hover);
+}
+
+.btn-primary:disabled {
+  background-color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background-color: var(--bg-secondary);
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+}
+
+.btn-secondary:hover {
+  background-color: var(--border-color);
+}
+
+/* Robot Card with Image */
+.robot-card {
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-color) 100%);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  overflow: hidden;
+  margin-bottom: 24px;
+  box-shadow: var(--shadow);
+}
+
+.robot-image-container {
+  position: relative;
+  background: linear-gradient(180deg, #e8f4fc 0%, #c9e4f6 100%);
+  padding: 24px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 180px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .robot-image-container {
+    background: linear-gradient(180deg, #1e3a4c 0%, #0d2233 100%);
+  }
+}
+
+.robot-image {
+  max-width: 200px;
+  max-height: 150px;
+  object-fit: contain;
+  filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.2));
+  transition: transform 0.3s ease;
+}
+
+.robot-image:hover {
+  transform: scale(1.05);
+}
+
+/* SVG Robot Illustration */
+.robot-svg {
+  width: 200px;
+  height: 160px;
+  filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.2));
+  transition: transform 0.3s ease;
+}
+
+.robot-svg:hover {
+  transform: scale(1.05);
+}
+
+.robot-svg svg {
+  width: 100%;
+  height: 100%;
+}
+
+.robot-image-fallback {
+  display: none;
+  width: 120px;
+  height: 120px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  justify-content: center;
+  align-items: center;
+}
+
+.robot-emoji {
+  font-size: 64px;
+}
+
+.robot-status-badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.95);
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #333;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+@media (prefers-color-scheme: dark) {
+  .robot-status-badge {
+    background: rgba(45, 45, 45, 0.95);
+    color: #e9ecef;
+  }
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--text-muted);
+}
+
+.status-dot.green {
+  background-color: var(--success-color);
+  box-shadow: 0 0 6px var(--success-color);
+}
+
+.robot-card-content {
+  padding: 20px;
+}
+
+.robot-card-name {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  color: var(--text-color);
+}
+
+.robot-card-details {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.robot-detail-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.robot-detail-item:last-child {
+  border-bottom: none;
+}
+
+.detail-label {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.detail-value {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-color);
+  font-family: 'SF Mono', SFMono-Regular, ui-monospace, monospace;
+}
+
+/* Legacy robot info (keep for compatibility) */
+.robot-info {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+  background-color: var(--bg-secondary);
+  border-radius: var(--border-radius);
+  margin-bottom: 30px;
+}
+
+.robot-icon {
+  font-size: 48px;
+}
+
+.robot-details h3 {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.robot-serial {
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+/* Options Section */
+.options-section {
+  padding: 20px;
+  background-color: var(--bg-secondary);
+  border-radius: var(--border-radius);
+}
+
+.options-section h4 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+/* Success Message */
+.success-message {
+  padding: 20px;
+  background-color: var(--bg-secondary);
+  border-radius: var(--border-radius);
+  margin-bottom: 20px;
+}
+
+.success-message p {
+  margin-bottom: 12px;
+}
+
+.success-message ul {
+  list-style: none;
+  padding-left: 0;
+}
+
+.success-message li {
+  padding: 8px 0;
+  padding-left: 24px;
+  position: relative;
+}
+
+.success-message li::before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  color: var(--success-color);
+  font-weight: bold;
+}
+
+/* Loading state */
+.btn-loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-loading::before {
+  content: "";
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Configured Robots List */
+#configured-robots-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+/* Clickable robot card */
+.robot-card-clickable {
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.robot-card-clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+@media (prefers-color-scheme: dark) {
+  .robot-card-clickable:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  }
+}
+
+/* Edit button on robot card */
+.edit-robot-btn {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.95);
+  color: var(--primary-color);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: background-color 0.2s, transform 0.2s;
+}
+
+.edit-robot-btn:hover {
+  background: var(--primary-color);
+  color: #fff;
+  transform: scale(1.1);
+}
+
+@media (prefers-color-scheme: dark) {
+  .edit-robot-btn {
+    background: rgba(45, 45, 45, 0.95);
+    color: var(--primary-color);
+  }
+
+  .edit-robot-btn:hover {
+    background: var(--primary-color);
+    color: #fff;
+  }
+}
+
+/* Account email in robot card */
+.detail-value {
+  word-break: break-all;
+  text-align: right;
+  max-width: 200px;
+}
+
+/* Cleaning Mode Info Box */
+.mode-info-box {
+  background: linear-gradient(135deg, rgba(0, 122, 255, 0.08) 0%, rgba(0, 122, 255, 0.03) 100%);
+  border: 1px solid rgba(0, 122, 255, 0.2);
+  border-radius: var(--border-radius);
+  padding: 14px;
+  margin-top: 12px;
+  margin-bottom: 20px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .mode-info-box {
+    background: linear-gradient(135deg, rgba(0, 122, 255, 0.15) 0%, rgba(0, 122, 255, 0.05) 100%);
+    border: 1px solid rgba(0, 122, 255, 0.3);
+  }
+}
+
+.mode-info-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.mode-info-icon {
+  font-size: 14px;
+}
+
+.mode-info-title {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--primary-color);
+}
+
+.mode-info-content {
+  font-size: 13px;
+  color: var(--text-color);
+  line-height: 1.5;
+  margin-bottom: 10px;
+}
+
+.mode-info-duration {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(0, 122, 255, 0.15);
+}
+
+.duration-icon {
+  font-size: 14px;
+}
+
+#mode-duration-text {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+}

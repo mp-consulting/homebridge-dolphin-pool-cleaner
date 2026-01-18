@@ -1,0 +1,81 @@
+/**
+ * MyDolphin Plus Homebridge Plugin Constants
+ */
+export const PLUGIN_NAME = 'homebridge-dolphin-pool-cleaner';
+export const PLATFORM_NAME = 'DolphinPoolCleaner';
+// Maytronics API Configuration
+export const MAYTRONICS_API = {
+  BASE_URL: 'https://apps.maytronics.com',
+  APP_KEY: '346BDE92-53D1-4829-8A2E-B496014B586C',
+  USER_AGENT: 'MyDolphin Plus/346 CFNetwork/3860.300.31 Darwin/25.2.0',
+};
+// AWS Cognito Configuration
+export const COGNITO = {
+  USER_POOL_ID: 'us-west-2_PKsEdCoP5',
+  CLIENT_ID: '4ed12eq01o6n0tl5f0sqmkq2na',
+  REGION: 'us-west-2',
+};
+// AWS IoT Configuration - endpoints by region (from iOS app Configuration.plist)
+// Production uses eu-west-1, regardless of user location
+export const IOT_ENDPOINTS: Record<string, string> = {
+  'eu-west-1': 'a12rqfdx55bdbv-ats.iot.eu-west-1.amazonaws.com', // Production
+  'eu-central-1': 'a2tgkimxdrkpxm-ats.iot.eu-central-1.amazonaws.com', // Test
+  'us-east-2': 'awqf0dif0s78s-ats.iot.us-east-2.amazonaws.com', // Development
+};
+// Default IoT endpoint (production) - eu-west-1 per iOS app config
+export const DEFAULT_IOT_ENDPOINT = IOT_ENDPOINTS['eu-west-1'];
+export const DEFAULT_IOT_REGION = 'eu-west-1';
+// MQTT Topics for AWS IoT
+export const MQTT_TOPICS = {
+  SHADOW_UPDATE: '$aws/things/%s/shadow/update',
+  SHADOW_UPDATE_ACCEPTED: '$aws/things/%s/shadow/update/accepted',
+  SHADOW_UPDATE_REJECTED: '$aws/things/%s/shadow/update/rejected',
+  SHADOW_GET: '$aws/things/%s/shadow/get',
+  SHADOW_GET_ACCEPTED: '$aws/things/%s/shadow/get/accepted',
+  SHADOW_GET_REJECTED: '$aws/things/%s/shadow/get/rejected',
+  DYNAMIC_CHANNEL: 'Maytronics/%s/main',
+};
+// Cleaning modes with their duration in minutes
+export const CLEANING_MODES: Record<string, { name: string; duration: number; value: number }> = {
+  regular: { name: 'All Surfaces', duration: 120, value: 0 },
+  short: { name: 'Fast Mode', duration: 60, value: 1 },
+  floor: { name: 'Floor Only', duration: 120, value: 2 },
+  wall: { name: 'Walls Only', duration: 120, value: 3 },
+  water: { name: 'Waterline', duration: 120, value: 4 },
+  ultra: { name: 'Ultra Clean', duration: 120, value: 5 },
+  cove: { name: 'Cove', duration: 120, value: 6 },
+  spot: { name: 'Spot Clean', duration: 120, value: 7 },
+  tictac: { name: 'TicTac', duration: 600, value: 8 },
+  pickup: { name: 'Pickup', duration: 5, value: 9 },
+  custom: { name: 'Custom', duration: 120, value: 10 },
+  stairs: { name: 'Stairs', duration: 120, value: 11 },
+};
+// Robot states
+export const ROBOT_STATES = {
+  OFF: 0x00,
+  INIT: 0x01,
+  SCANNING: 0x02,
+  CLEANING: 0x03,
+  FAULT: 0x04,
+  PROGRAMMING: 0x05,
+  END_OF_CYCLE: 0x06,
+  PICKUP: 0x07,
+  REMOTE_CONTROL: 0x08,
+  CLEANING_PAUSE: 0x0b,
+};
+// Power supply states
+export const PWS_STATES = {
+  OFF: 0x00,
+  HOLD_DELAY: 0x01,
+  HOLD_WEEKLY: 0x02,
+  PROGRAMMING: 0x03,
+  ERROR: 0x04,
+  CLEANING: 0x05,
+  IDLE: 0x06,
+};
+// Polling intervals
+export const DEFAULT_POLLING_INTERVAL = 60; // seconds
+export const MIN_POLLING_INTERVAL = 30; // seconds
+// Credential refresh timing
+export const CREDENTIAL_REFRESH_BUFFER_MS = 60 * 60 * 1000; // 1 hour before expiry
+//# sourceMappingURL=constants.js.map
