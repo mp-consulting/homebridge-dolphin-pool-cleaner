@@ -77,6 +77,11 @@ export class DolphinAccessory {
       this.platform.Characteristic.Name,
       this.device.name,
     );
+    // Set ConfiguredName for better HomeKit display
+    this.switchService.setCharacteristic(
+      this.platform.Characteristic.ConfiguredName,
+      this.device.name,
+    );
     // Set up switch handlers
     this.switchService
       .getCharacteristic(this.platform.Characteristic.On)
@@ -96,6 +101,10 @@ export class DolphinAccessory {
         );
       this.temperatureService.setCharacteristic(
         this.platform.Characteristic.Name,
+        `${this.device.name} Water Temperature`,
+      );
+      this.temperatureService.setCharacteristic(
+        this.platform.Characteristic.ConfiguredName,
         `${this.device.name} Water Temperature`,
       );
       this.temperatureService
@@ -121,6 +130,10 @@ export class DolphinAccessory {
         );
       this.filterService.setCharacteristic(
         this.platform.Characteristic.Name,
+        `${this.device.name} Filter`,
+      );
+      this.filterService.setCharacteristic(
+        this.platform.Characteristic.ConfiguredName,
         `${this.device.name} Filter`,
       );
       this.filterService

@@ -416,16 +416,18 @@ body {
 
 .success-message li {
   padding: 8px 0;
-  padding-left: 24px;
+  padding-left: 28px;
   position: relative;
 }
 
 .success-message li::before {
   content: "✓";
   position: absolute;
-  left: 0;
+  left: 4px;
+  top: 8px;
   color: var(--success-color);
   font-weight: bold;
+  font-size: 14px;
 }
 
 /* Loading state */
