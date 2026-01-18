@@ -194,7 +194,7 @@ Or add to your Homebridge startup arguments:
 
 ```bash
 # Clone repository
-git clone https://github.com/mickael/homebridge-dolphin-pool-cleaner.git
+git clone https://github.com/mp-consulting/homebridge-dolphin-pool-cleaner.git
 cd homebridge-dolphin-pool-cleaner
 
 # Install dependencies
@@ -237,9 +237,9 @@ The MyDolphin Plus API is not officially documented. This plugin was developed t
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/mickael/homebridge-dolphin-pool-cleaner/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/mickael/homebridge-dolphin-pool-cleaner/discussions)
+- **Issues**: [GitHub Issues](https://github.com/mp-consulting/homebridge-dolphin-pool-cleaner/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/mp-consulting/homebridge-dolphin-pool-cleaner/discussions)
 
 ---
 
-Made with :swimming_man: by [@mickael](https://github.com/mickael)
+Made with :swimming_man: by [@mickael](https://github.com/mp-consulting)

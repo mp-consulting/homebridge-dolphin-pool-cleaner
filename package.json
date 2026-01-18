@@ -1,6 +1,7 @@
 {
   "name": "@mp-consulting/homebridge-dolphin-pool-cleaner",
-  "version": "1.0.0",
+  "displayName": "Dolphin Pool Cleaner",
+  "version": "1.0.2",
   "description": "Homebridge plugin for MyDolphin Plus pool cleaning robots (Maytronics)",
   "type": "module",
   "main": "dist/index.js",
@@ -18,14 +19,21 @@
     "homebridge-plugin",
     "homebridge",
     "mydolphin",
+    "mydolphin-plus",
     "maytronics",
     "dolphin",
     "pool",
-    "robot",
-    "cleaner",
-    "pool-cleaner"
+    "pool-robot",
+    "pool-cleaner",
+    "robot-cleaner",
+    "swimming-pool",
+    "smart-home",
+    "homekit",
+    "apple-home",
+    "iot",
+    "automation"
   ],
-  "author": "Mickael",
+  "author": "MP Consulting",
   "license": "MIT",
   "engines": {
     "node": ">=18.0.0",
@@ -33,9 +41,16 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/mickael/homebridge-dolphin-pool-cleaner.git"
+    "url": "git+https://github.com/mp-consulting/homebridge-dolphin-pool-cleaner.git"
   },
-  "homepage": "https://github.com/mickael/homebridge-dolphin-pool-cleaner#readme",
+  "bugs": {
+    "url": "https://github.com/mp-consulting/homebridge-dolphin-pool-cleaner/issues"
+  },
+  "funding": {
+    "type": "github",
+    "url": "https://github.com/sponsors/mp-consulting"
+  },
+  "homepage": "https://github.com/mp-consulting/homebridge-dolphin-pool-cleaner#readme",
   "dependencies": {
     "@aws-sdk/client-cognito-identity-provider": "^3.540.0",
     "@aws-sdk/client-iot": "^3.971.0",
