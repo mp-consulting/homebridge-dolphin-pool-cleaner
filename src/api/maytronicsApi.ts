@@ -295,7 +295,7 @@ export class MaytronicsAPI {
       }
     } catch (error) {
       const err = error as Error;
-      this.log.warn(
+      this.log.debug(
         `Failed to discover IoT endpoint: ${err.message}. Using default.`,
       );
       // Keep using the configured/default endpoint
