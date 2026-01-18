@@ -3,10 +3,16 @@
  *
  * Provides authentication wizard for MyDolphin Plus account.
  * Supports OTP/MFA verification flow.
+ *
+ * Note: This file uses dynamic import() because @homebridge/plugin-ui-utils
+ * is CommonJS but this project uses "type": "module".
  */
 
-import { HomebridgePluginUiServer } from '@homebridge/plugin-ui-utils';
-import { execSync } from 'child_process';
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+
+const { HomebridgePluginUiServer } = require('@homebridge/plugin-ui-utils');
+const { execSync } = require('child_process');
 
 const COGNITO_REGION = 'us-west-2';
 const COGNITO_CLIENT_ID = '4ed12eq01o6n0tl5f0sqmkq2na';

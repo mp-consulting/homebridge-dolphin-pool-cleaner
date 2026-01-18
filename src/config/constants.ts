@@ -1,7 +1,7 @@
 /**
  * MyDolphin Plus Homebridge Plugin Constants
  */
-export const PLUGIN_NAME = 'homebridge-dolphin-pool-cleaner';
+export const PLUGIN_NAME = '@mp-consulting/homebridge-dolphin-pool-cleaner';
 export const PLATFORM_NAME = 'DolphinPoolCleaner';
 // Maytronics API Configuration
 export const MAYTRONICS_API = {

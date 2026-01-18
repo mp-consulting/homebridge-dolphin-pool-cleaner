@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.5] - 2026-01-18
+
+### Added
+
+- homebridge-config-ui-x as dev dependency for local UI testing
+- Cleaning mode info box showing description and duration
+
+### Changed
+
+- Simplified cleaning mode dropdown options with details in info box
+- Improved nodemon config to also watch homebridge-ui folder
+- Fixed plugin name constant to use scoped package name
+
+### Fixed
+
+- Fixed server.js imports for CommonJS compatibility with ES modules
+- Fixed checkmark alignment in success message using flexbox
+
 ## [1.0.4] - 2026-01-18
 
 ### Changed
@@ -100,6 +118,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Uses AWS SDK v3 for Cognito and IoT
 - MQTT 5.x for real-time communication
 
+[1.0.5]: https://github.com/mp-consulting/homebridge-dolphin-pool-cleaner/releases/tag/v1.0.5
 [1.0.4]: https://github.com/mp-consulting/homebridge-dolphin-pool-cleaner/releases/tag/v1.0.4
 [1.0.3]: https://github.com/mp-consulting/homebridge-dolphin-pool-cleaner/releases/tag/v1.0.3
 [1.0.2]: https://github.com/mp-consulting/homebridge-dolphin-pool-cleaner/releases/tag/v1.0.2

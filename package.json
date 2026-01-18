@@ -1,7 +1,7 @@
 {
   "name": "@mp-consulting/homebridge-dolphin-pool-cleaner",
   "displayName": "Dolphin Pool Cleaner",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Homebridge plugin for MyDolphin Plus pool cleaning robots (Maytronics)",
   "type": "module",
   "main": "dist/index.js",
@@ -68,7 +68,8 @@
     "rimraf": "^6.0.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.53.0",
-    "vitest": "^4.0.17"
+    "vitest": "^4.0.17",
+    "homebridge-config-ui-x": "^5.15.0"
   },
   "homebridge": {
     "pluginAlias": "DolphinPoolCleaner",
