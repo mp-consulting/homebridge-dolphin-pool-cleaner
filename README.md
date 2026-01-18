@@ -7,7 +7,7 @@
 Control your Maytronics Dolphin pool cleaning robot through Apple HomeKit using Homebridge.
 
 <p align="center">
-  <img src="https://user-images.githubusercontent.com/placeholder/dolphin-homekit.png" alt="Dolphin Pool Cleaner in HomeKit" width="300">
+  <img src="assets/maytronics-logo.png" alt="Maytronics Dolphin" width="400">
 </p>
 
 ## Features
