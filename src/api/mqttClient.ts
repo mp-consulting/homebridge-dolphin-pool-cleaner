@@ -90,7 +90,6 @@ export class MQTTClient extends EventEmitter {
           rejectUnauthorized: true,
         });
         this.client.on('connect', async () => {
-          this.log.info(`MQTT connected for robot ${this.serialNumber}`);
           this.connected = true;
           this.reconnectAttempts = 0;
           // Subscribe to topics and wait for completion
@@ -109,19 +108,17 @@ export class MQTTClient extends EventEmitter {
           }
         });
         this.client.on('close', () => {
-          this.log.debug('MQTT connection closed');
+          // Suppress close logs - connection drops are normal with AWS IoT
           this.connected = false;
           this.emit('disconnected');
         });
         this.client.on('offline', () => {
-          this.log.debug('MQTT client offline');
+          // Suppress offline logs - this is expected during reconnects
           this.connected = false;
         });
         this.client.on('reconnect', () => {
           this.reconnectAttempts++;
-          this.log.debug(
-            `MQTT reconnecting (attempt ${this.reconnectAttempts})`,
-          );
+          // Only log after multiple failed attempts
           if (this.reconnectAttempts > this.maxReconnectAttempts) {
             this.log.error('Max reconnection attempts reached');
             this.disconnect();
@@ -250,24 +247,18 @@ export class MQTTClient extends EventEmitter {
       // Dynamic channel from Maytronics
       `Maytronics/${truncatedSerial}/main`,
     ];
-    this.log.debug(
-      `Subscribing to ${topics.length} topics for serial: ${truncatedSerial} (full: ${this.serialNumber})`,
-    );
-    // Subscribe to all topics
+    // Subscribe to all topics (silently - only log errors)
     const subscribePromises = topics.map((topic) => {
       return new Promise<void>((resolve) => {
         this.client!.subscribe(topic, { qos: 1 }, (err: Error | null) => {
           if (err) {
             this.log.warn(`Failed to subscribe to ${topic}:`, err.message);
-          } else {
-            this.log.debug(`Subscribed to ${topic}`);
           }
           resolve(); // Resolve even on error to not block
         });
       });
     });
     await Promise.all(subscribePromises);
-    this.log.debug('Topic subscription complete');
   }
   /**
    * Handle incoming MQTT messages

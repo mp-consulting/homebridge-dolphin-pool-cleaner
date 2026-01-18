@@ -60,6 +60,7 @@ export class MaytronicsAPI {
   private iotRegion: string;
   private iotEndpoint: string;
   private readonly refreshToken: string | undefined;
+  private hasLoggedMqttConnection = false;
 
   constructor(
     email: string | undefined,
@@ -333,7 +334,11 @@ export class MaytronicsAPI {
     });
     // Connect to MQTT
     await this.mqttClient.connect();
-    this.log.debug(`MQTT client initialized for region: ${this.iotRegion}`);
+    // Only log connection message once
+    if (!this.hasLoggedMqttConnection) {
+      this.hasLoggedMqttConnection = true;
+      this.log.info(`MQTT connected for robot ${this.userSerialNumber}`);
+    }
   }
   /**
    * Check if credentials need refresh
@@ -361,7 +366,7 @@ export class MaytronicsAPI {
   async getThingShadow(serialNumber: string): Promise<any | undefined> {
     await this.ensureValidCredentials();
     if (!this.mqttClient || !this.mqttClient.isConnected()) {
-      this.log.warn('MQTT client not connected, attempting to reconnect...');
+      this.log.debug('MQTT client not connected, reconnecting...');
       await this.initializeMQTTClient();
     }
     try {
@@ -391,7 +396,7 @@ export class MaytronicsAPI {
   async updateThingShadow(serialNumber: string, command: ThingShadowCommand): Promise<boolean> {
     await this.ensureValidCredentials();
     if (!this.mqttClient || !this.mqttClient.isConnected()) {
-      this.log.warn('MQTT client not connected, attempting to reconnect...');
+      this.log.debug('MQTT client not connected, reconnecting...');
       await this.initializeMQTTClient();
     }
     try {

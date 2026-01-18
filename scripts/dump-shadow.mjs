@@ -13,7 +13,7 @@ import { fileURLToPath } from 'url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // Import the compiled API
-const { MaytronicsAPI } = await import('../../dist/api/maytronicsApi.js');
+const { MaytronicsAPI } = await import('../dist/api/maytronicsApi.js');
 
 // Simple console logger
 const logger = {
@@ -26,7 +26,7 @@ const logger = {
 };
 
 // Load config
-const configPath = join(__dirname, '../hbConfig/config.json');
+const configPath = join(__dirname, '../test/hbConfig/config.json');
 const config = JSON.parse(readFileSync(configPath, 'utf-8'));
 
 const platformConfig = config.platforms.find((p) => p.platform === 'DolphinPoolCleaner');
