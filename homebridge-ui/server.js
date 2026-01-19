@@ -3,27 +3,260 @@
  *
  * Provides authentication wizard for MyDolphin Plus account.
  * Supports OTP/MFA verification flow.
- *
- * Note: This file uses dynamic import() because @homebridge/plugin-ui-utils
- * is CommonJS but this project uses "type": "module".
  */
-
 import { createRequire } from 'module';
+
 const require = createRequire(import.meta.url);
-
 const { HomebridgePluginUiServer } = require('@homebridge/plugin-ui-utils');
-const { execSync } = require('child_process');
 
+// Configuration constants
 const COGNITO_REGION = 'us-west-2';
 const COGNITO_CLIENT_ID = '4ed12eq01o6n0tl5f0sqmkq2na';
 const MAYTRONICS_BASE_URL = 'https://apps.maytronics.com';
 const APP_KEY = '346BDE92-53D1-4829-8A2E-B496014B586C';
+const REQUEST_TIMEOUT = 30000;
 
+/**
+ * Challenge type messages
+ */
+const CHALLENGE_MESSAGES = {
+  SMS_MFA: 'Please enter the verification code sent to your phone',
+  SOFTWARE_TOKEN_MFA: 'Please enter the code from your authenticator app',
+  CUSTOM_CHALLENGE: 'Please enter the verification code sent to your email',
+  MFA_SETUP: 'MFA setup required. Please complete setup in the MyDolphin app first.',
+};
+
+/**
+ * HTTP client wrapper using native fetch
+ */
+class HttpClient {
+  /**
+   * Make a POST request to Cognito
+   */
+  static async cognitoRequest(target, payload) {
+    const response = await fetch(`https://cognito-idp.${COGNITO_REGION}.amazonaws.com/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-amz-json-1.1',
+        'X-Amz-Target': `AWSCognitoIdentityProviderService.${target}`,
+      },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT),
+    });
+
+    return response.json();
+  }
+
+  /**
+   * Make a request to Maytronics API
+   */
+  static async maytronicsRequest(endpoint, idToken, body = null) {
+    const options = {
+      method: body ? 'POST' : 'GET',
+      headers: {
+        'Authorization': `Bearer ${idToken}`,
+        'AppKey': APP_KEY,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT),
+    };
+
+    if (body) {
+      options.body = body;
+    }
+
+    const response = await fetch(`${MAYTRONICS_BASE_URL}${endpoint}`, options);
+    return response.json();
+  }
+}
+
+/**
+ * Cognito authentication service
+ */
+class CognitoAuthService {
+  /**
+   * Parse Cognito error response
+   */
+  static parseError(response) {
+    if (!response.__type) {
+      return null;
+    }
+
+    const errorMap = {
+      NotAuthorizedException: 'Invalid email or password',
+      UserNotFoundException: 'User not found. Please check your email address.',
+      UserNotConfirmedException: 'Please confirm your email address first',
+      CodeMismatchException: 'Invalid verification code',
+      ExpiredCodeException: 'Verification code has expired. Please try again.',
+    };
+
+    for (const [errorType, message] of Object.entries(errorMap)) {
+      if (response.__type.includes(errorType)) {
+        return { success: false, error: message };
+      }
+    }
+
+    return { success: false, error: response.message || 'Authentication failed' };
+  }
+
+  /**
+   * Initiate CUSTOM_AUTH flow (triggers OTP)
+   */
+  static async initiateAuth(email) {
+    const response = await HttpClient.cognitoRequest('InitiateAuth', {
+      AuthFlow: 'CUSTOM_AUTH',
+      ClientId: COGNITO_CLIENT_ID,
+      AuthParameters: { USERNAME: email },
+    });
+
+    // Check for errors
+    const error = this.parseError(response);
+    if (error) {
+      return error;
+    }
+
+    // Handle challenge (OTP required)
+    if (response.ChallengeName) {
+      return {
+        success: false,
+        requiresOtp: true,
+        challengeName: response.ChallengeName,
+        session: response.Session,
+        message: CHALLENGE_MESSAGES[response.ChallengeName] || 'Please enter the verification code',
+      };
+    }
+
+    // Direct success (rare with CUSTOM_AUTH)
+    if (response.AuthenticationResult?.IdToken) {
+      return {
+        success: true,
+        idToken: response.AuthenticationResult.IdToken,
+        accessToken: response.AuthenticationResult.AccessToken,
+        refreshToken: response.AuthenticationResult.RefreshToken,
+      };
+    }
+
+    return { success: false, error: 'Unexpected authentication response' };
+  }
+
+  /**
+   * Respond to auth challenge (OTP verification)
+   */
+  static async respondToChallenge(email, code, session, challengeName) {
+    const challengeResponses = { USERNAME: email };
+
+    // Set the appropriate response field based on challenge type
+    const responseField = {
+      SMS_MFA: 'SMS_MFA_CODE',
+      SOFTWARE_TOKEN_MFA: 'SOFTWARE_TOKEN_MFA_CODE',
+      CUSTOM_CHALLENGE: 'ANSWER',
+    }[challengeName] || 'SMS_MFA_CODE';
+
+    challengeResponses[responseField] = code;
+
+    const response = await HttpClient.cognitoRequest('RespondToAuthChallenge', {
+      ChallengeName: challengeName,
+      ClientId: COGNITO_CLIENT_ID,
+      Session: session,
+      ChallengeResponses: challengeResponses,
+    });
+
+    // Check for errors
+    const error = this.parseError(response);
+    if (error) {
+      return error;
+    }
+
+    // Another challenge (rare)
+    if (response.ChallengeName) {
+      return {
+        success: false,
+        requiresOtp: true,
+        challengeName: response.ChallengeName,
+        session: response.Session,
+        message: CHALLENGE_MESSAGES[response.ChallengeName] || 'Please enter the verification code',
+      };
+    }
+
+    // Success
+    if (!response.AuthenticationResult?.IdToken) {
+      return { success: false, error: 'No authentication token received' };
+    }
+
+    return {
+      success: true,
+      idToken: response.AuthenticationResult.IdToken,
+      accessToken: response.AuthenticationResult.AccessToken,
+      refreshToken: response.AuthenticationResult.RefreshToken,
+    };
+  }
+}
+
+/**
+ * MyDolphin API service
+ */
+class MyDolphinService {
+  /**
+   * Authenticate with MyDolphin backend
+   */
+  static async authenticate(idToken) {
+    const response = await HttpClient.maytronicsRequest(
+      '/mobapi/user/authenticate-user/',
+      idToken,
+      '', // Empty body for POST
+    );
+
+    if (response.Status !== '1') {
+      return { success: false, error: response.Alert || 'MyDolphin authentication failed' };
+    }
+
+    const data = response.Data;
+    return {
+      success: true,
+      serialNumber: data.Sernum,
+      robotName: data.MyRobotName || 'Dolphin Robot',
+      deviceType: parseInt(data.connectVia, 10) || 62,
+      mobToken: data.mob_token,
+    };
+  }
+
+  /**
+   * Get robot details including image URL
+   */
+  static async getRobotDetails(serialNumber, idToken) {
+    const response = await HttpClient.maytronicsRequest(
+      '/mobapi/serial-numbers/getRobotDetailsByRobotSN/',
+      idToken,
+      `SERNUM=${serialNumber}`,
+    );
+
+    if (response.Status !== '1') {
+      return { success: false, error: response.Alert || 'Failed to get robot details' };
+    }
+
+    const data = response.Data;
+    return {
+      success: true,
+      imageUrl: data.originalUrlImage || data.Originalmg,
+      partName: data.PARTNAME,
+      partDescription: data.PARTDES,
+      robotFamily: data.RobotFamily,
+      robotName: data.MyRobotName,
+      warrantyDays: data.warranty_days,
+      registrationDate: data.RegDate,
+      truncatedSerial: data.eSERNUM,
+    };
+  }
+}
+
+/**
+ * Homebridge UI Server for Dolphin plugin
+ */
 class DolphinUiServer extends HomebridgePluginUiServer {
   constructor() {
     super();
 
-    // Store pending auth sessions
+    // Store pending auth sessions (email -> session data)
     this.pendingSessions = new Map();
 
     // Register request handlers
@@ -36,8 +269,8 @@ class DolphinUiServer extends HomebridgePluginUiServer {
   }
 
   /**
-   * Step 1: Initiate CUSTOM_AUTH flow with Cognito
-   * Only email is required - OTP will be sent to user
+   * Handle authentication request
+   * Initiates CUSTOM_AUTH flow with Cognito (triggers OTP)
    */
   async handleAuthenticate(payload) {
     const { email } = payload;
@@ -47,53 +280,32 @@ class DolphinUiServer extends HomebridgePluginUiServer {
     }
 
     try {
-      // Step 1: Initiate CUSTOM_AUTH with AWS Cognito (triggers OTP)
-      const cognitoResult = await this.authenticateWithCognito(email);
+      // Step 1: Initiate Cognito auth
+      const cognitoResult = await CognitoAuthService.initiateAuth(email);
 
-      // Check if OTP/MFA is required
+      // OTP required - store session and return
       if (cognitoResult.requiresOtp) {
-        // Store session for OTP verification
         this.pendingSessions.set(email, {
           session: cognitoResult.session,
           challengeName: cognitoResult.challengeName,
         });
-
-        return {
-          success: false,
-          requiresOtp: true,
-          challengeName: cognitoResult.challengeName,
-          message: cognitoResult.message || 'Please enter the verification code sent to your email',
-        };
+        return cognitoResult;
       }
 
       if (!cognitoResult.success) {
         return cognitoResult;
       }
 
-      // Step 2: Authenticate with MyDolphin backend
-      const myDolphinResult = await this.authenticateWithMyDolphin(cognitoResult.idToken);
-
-      if (!myDolphinResult.success) {
-        return myDolphinResult;
-      }
-
-      return {
-        success: true,
-        serialNumber: myDolphinResult.serialNumber,
-        robotName: myDolphinResult.robotName,
-        deviceType: myDolphinResult.deviceType,
-      };
+      // Step 2: Authenticate with MyDolphin
+      return this.completeAuthentication(cognitoResult);
     } catch (error) {
       console.error('Authentication error:', error);
-      return {
-        success: false,
-        error: error.message || 'Authentication failed',
-      };
+      return { success: false, error: error.message || 'Authentication failed' };
     }
   }
 
   /**
-   * Step 2: Verify OTP code for MFA
+   * Handle OTP verification
    */
   async handleVerifyOtp(payload) {
     const { email, otpCode } = payload;
@@ -108,8 +320,8 @@ class DolphinUiServer extends HomebridgePluginUiServer {
     }
 
     try {
-      // Respond to Cognito auth challenge
-      const cognitoResult = await this.respondToAuthChallenge(
+      // Respond to Cognito challenge
+      const cognitoResult = await CognitoAuthService.respondToChallenge(
         email,
         otpCode,
         session.session,
@@ -123,306 +335,73 @@ class DolphinUiServer extends HomebridgePluginUiServer {
       // Clear pending session
       this.pendingSessions.delete(email);
 
-      // Step 2: Authenticate with MyDolphin backend
-      const myDolphinResult = await this.authenticateWithMyDolphin(cognitoResult.idToken);
+      // Complete authentication with MyDolphin
+      const result = await this.completeAuthentication(cognitoResult);
 
-      if (!myDolphinResult.success) {
-        return myDolphinResult;
+      // Include tokens for plugin storage
+      if (result.success) {
+        result.idToken = cognitoResult.idToken;
+        result.accessToken = cognitoResult.accessToken;
+        result.refreshToken = cognitoResult.refreshToken;
       }
 
-      return {
-        success: true,
-        serialNumber: myDolphinResult.serialNumber,
-        robotName: myDolphinResult.robotName,
-        deviceType: myDolphinResult.deviceType,
-        robotImageUrl: myDolphinResult.robotImageUrl,
-        // Return tokens for storage - needed for plugin authentication
-        idToken: cognitoResult.idToken,
-        accessToken: cognitoResult.accessToken,
-        refreshToken: cognitoResult.refreshToken,
-      };
+      return result;
     } catch (error) {
       console.error('OTP verification error:', error);
-      return {
-        success: false,
-        error: error.message || 'OTP verification failed',
-      };
+      return { success: false, error: error.message || 'OTP verification failed' };
     }
   }
 
   /**
-   * Authenticate with AWS Cognito using CUSTOM_AUTH flow
-   * This flow always requires OTP verification
+   * Complete authentication by calling MyDolphin API
    */
-  async authenticateWithCognito(email) {
+  async completeAuthentication(cognitoResult) {
+    const myDolphinResult = await MyDolphinService.authenticate(cognitoResult.idToken);
+
+    if (!myDolphinResult.success) {
+      return myDolphinResult;
+    }
+
+    // Try to fetch robot image
+    let robotImageUrl = null;
     try {
-      // CUSTOM_AUTH flow - Step 1: Initiate auth (triggers OTP to be sent)
-      const payload = JSON.stringify({
-        AuthFlow: 'CUSTOM_AUTH',
-        ClientId: COGNITO_CLIENT_ID,
-        AuthParameters: {
-          USERNAME: email,
-        },
-      });
-
-      const result = execSync(
-        `curl -s -X POST \
-          "https://cognito-idp.${COGNITO_REGION}.amazonaws.com/" \
-          -H "Content-Type: application/x-amz-json-1.1" \
-          -H "X-Amz-Target: AWSCognitoIdentityProviderService.InitiateAuth" \
-          -d '${payload.replace(/'/g, "'\\''")}'`,
-        { encoding: 'utf-8', timeout: 30000 },
+      const details = await MyDolphinService.getRobotDetails(
+        myDolphinResult.serialNumber,
+        cognitoResult.idToken,
       );
-
-      const response = JSON.parse(result);
-
-      // Check for errors
-      if (response.__type) {
-        if (response.__type.includes('NotAuthorizedException')) {
-          return { success: false, error: 'Invalid email or password' };
-        }
-        if (response.__type.includes('UserNotFoundException')) {
-          return { success: false, error: 'User not found. Please check your email address.' };
-        }
-        if (response.__type.includes('UserNotConfirmedException')) {
-          return { success: false, error: 'Please confirm your email address first' };
-        }
-        return { success: false, error: response.message || 'Cognito authentication failed' };
+      if (details.success) {
+        robotImageUrl = details.imageUrl;
       }
-
-      // CUSTOM_AUTH always returns a challenge
-      if (response.ChallengeName) {
-        return {
-          success: false,
-          requiresOtp: true,
-          challengeName: response.ChallengeName,
-          session: response.Session,
-          message: this.getChallengeMessage(response.ChallengeName),
-        };
-      }
-
-      // Rare: Success without challenge (shouldn't happen with CUSTOM_AUTH)
-      if (response.AuthenticationResult?.IdToken) {
-        return {
-          success: true,
-          idToken: response.AuthenticationResult.IdToken,
-          accessToken: response.AuthenticationResult.AccessToken,
-          refreshToken: response.AuthenticationResult.RefreshToken,
-        };
-      }
-
-      return { success: false, error: 'Unexpected authentication response' };
-    } catch (error) {
-      console.error('Cognito error:', error);
-      return { success: false, error: 'Failed to connect to authentication service' };
+    } catch (err) {
+      console.log('Could not fetch robot image URL:', err.message);
     }
-  }
 
-  /**
-   * Respond to Cognito auth challenge (OTP verification)
-   */
-  async respondToAuthChallenge(email, code, session, challengeName) {
-    try {
-      const challengeResponses = {
-        USERNAME: email,
-      };
-
-      // Handle different challenge types
-      if (challengeName === 'SMS_MFA') {
-        challengeResponses.SMS_MFA_CODE = code;
-      } else if (challengeName === 'SOFTWARE_TOKEN_MFA') {
-        challengeResponses.SOFTWARE_TOKEN_MFA_CODE = code;
-      } else if (challengeName === 'CUSTOM_CHALLENGE') {
-        challengeResponses.ANSWER = code;
-      } else {
-        // Default - most common for email OTP
-        challengeResponses.SMS_MFA_CODE = code;
-      }
-
-      const payload = JSON.stringify({
-        ChallengeName: challengeName,
-        ClientId: COGNITO_CLIENT_ID,
-        Session: session,
-        ChallengeResponses: challengeResponses,
-      });
-
-      const result = execSync(
-        `curl -s -X POST \
-          "https://cognito-idp.${COGNITO_REGION}.amazonaws.com/" \
-          -H "Content-Type: application/x-amz-json-1.1" \
-          -H "X-Amz-Target: AWSCognitoIdentityProviderService.RespondToAuthChallenge" \
-          -d '${payload.replace(/'/g, "'\\''")}'`,
-        { encoding: 'utf-8', timeout: 30000 },
-      );
-
-      const response = JSON.parse(result);
-
-      // Check for errors
-      if (response.__type) {
-        if (response.__type.includes('CodeMismatchException')) {
-          return { success: false, error: 'Invalid verification code' };
-        }
-        if (response.__type.includes('ExpiredCodeException')) {
-          return { success: false, error: 'Verification code has expired. Please try again.' };
-        }
-        if (response.__type.includes('NotAuthorizedException')) {
-          return { success: false, error: 'Session expired. Please start over.' };
-        }
-        return { success: false, error: response.message || 'Verification failed' };
-      }
-
-      // Check for another challenge (rare)
-      if (response.ChallengeName) {
-        return {
-          success: false,
-          requiresOtp: true,
-          challengeName: response.ChallengeName,
-          session: response.Session,
-          message: this.getChallengeMessage(response.ChallengeName),
-        };
-      }
-
-      // Success
-      if (!response.AuthenticationResult?.IdToken) {
-        return { success: false, error: 'No authentication token received' };
-      }
-
-      return {
-        success: true,
-        idToken: response.AuthenticationResult.IdToken,
-        accessToken: response.AuthenticationResult.AccessToken,
-        refreshToken: response.AuthenticationResult.RefreshToken,
-      };
-    } catch (error) {
-      console.error('Challenge response error:', error);
-      return { success: false, error: 'Failed to verify code' };
-    }
-  }
-
-  /**
-   * Get user-friendly message for challenge type
-   */
-  getChallengeMessage(challengeName) {
-    const messages = {
-      SMS_MFA: 'Please enter the verification code sent to your phone',
-      SOFTWARE_TOKEN_MFA: 'Please enter the code from your authenticator app',
-      CUSTOM_CHALLENGE: 'Please enter the verification code sent to your email',
-      MFA_SETUP: 'MFA setup required. Please complete setup in the MyDolphin app first.',
+    return {
+      success: true,
+      serialNumber: myDolphinResult.serialNumber,
+      robotName: myDolphinResult.robotName,
+      deviceType: myDolphinResult.deviceType,
+      robotImageUrl,
     };
-    return messages[challengeName] || 'Please enter the verification code';
-  }
-
-  /**
-   * Authenticate with MyDolphin backend
-   */
-  async authenticateWithMyDolphin(idToken) {
-    try {
-      const result = execSync(
-        `curl -s -X POST \
-          "${MAYTRONICS_BASE_URL}/mobapi/user/authenticate-user/" \
-          -H "Authorization: Bearer ${idToken}" \
-          -H "AppKey: ${APP_KEY}" \
-          -H "Content-Type: application/x-www-form-urlencoded"`,
-        { encoding: 'utf-8', timeout: 30000 },
-      );
-
-      const response = JSON.parse(result);
-
-      if (response.Status !== '1') {
-        return { success: false, error: response.Alert || 'MyDolphin authentication failed' };
-      }
-
-      const serialNumber = response.Data.Sernum;
-      const robotName = response.Data.MyRobotName || 'Dolphin Robot';
-      const deviceType = parseInt(response.Data.connectVia, 10) || 62;
-
-      // Fetch robot details including image URL
-      let robotImageUrl = null;
-      try {
-        const robotDetails = await this.getRobotDetails(serialNumber, idToken);
-        if (robotDetails.success && robotDetails.imageUrl) {
-          robotImageUrl = robotDetails.imageUrl;
-        }
-      } catch (err) {
-        console.log('Could not fetch robot image URL:', err.message);
-      }
-
-      return {
-        success: true,
-        serialNumber,
-        robotName,
-        deviceType,
-        mobToken: response.Data.mob_token,
-        robotImageUrl,
-      };
-    } catch (error) {
-      console.error('MyDolphin error:', error);
-      return { success: false, error: 'Failed to connect to MyDolphin service' };
-    }
-  }
-
-  /**
-   * Get robot details including product image URL
-   * Endpoint: /mobapi/serial-numbers/getRobotDetailsByRobotSN/
-   */
-  async getRobotDetails(serialNumber, idToken) {
-    try {
-      const result = execSync(
-        `curl -s -X POST \
-          "${MAYTRONICS_BASE_URL}/mobapi/serial-numbers/getRobotDetailsByRobotSN/" \
-          -H "Authorization: Bearer ${idToken}" \
-          -H "AppKey: ${APP_KEY}" \
-          -H "Content-Type: application/x-www-form-urlencoded" \
-          -d "SERNUM=${serialNumber}"`,
-        { encoding: 'utf-8', timeout: 30000 },
-      );
-
-      const response = JSON.parse(result);
-
-      if (response.Status !== '1') {
-        return { success: false, error: response.Alert || 'Failed to get robot details' };
-      }
-
-      return {
-        success: true,
-        imageUrl: response.Data.originalUrlImage || response.Data.Originalmg,
-        partName: response.Data.PARTNAME,
-        partDescription: response.Data.PARTDES,
-        robotFamily: response.Data.RobotFamily,
-        robotName: response.Data.MyRobotName,
-        warrantyDays: response.Data.warranty_days,
-        registrationDate: response.Data.RegDate,
-        truncatedSerial: response.Data.eSERNUM,
-      };
-    } catch (error) {
-      console.error('Robot details error:', error);
-      return { success: false, error: 'Failed to get robot details' };
-    }
   }
 
   /**
    * Get robot list for authenticated user
    */
   async handleGetRobots(payload) {
-    const { email, password } = payload;
-
-    // First authenticate
-    const authResult = await this.handleAuthenticate({ email, password });
+    const authResult = await this.handleAuthenticate(payload);
 
     if (!authResult.success) {
       return authResult;
     }
 
-    // Return robot info
     return {
       success: true,
-      robots: [
-        {
-          serialNumber: authResult.serialNumber,
-          name: authResult.robotName,
-          deviceType: authResult.deviceType,
-        },
-      ],
+      robots: [{
+        serialNumber: authResult.serialNumber,
+        name: authResult.robotName,
+        deviceType: authResult.deviceType,
+      }],
     };
   }
 
@@ -430,9 +409,7 @@ class DolphinUiServer extends HomebridgePluginUiServer {
    * Test connection to MyDolphin service
    */
   async handleTestConnection(payload) {
-    const { email, password } = payload;
-
-    const result = await this.handleAuthenticate({ email, password });
+    const result = await this.handleAuthenticate(payload);
 
     if (result.success) {
       return {
