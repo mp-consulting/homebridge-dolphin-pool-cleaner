@@ -43,9 +43,10 @@ const BASE_IOT_FEATURES: DeviceFeatures = {
   ],
 };
 // M400/M600 series features
+// Note: Temperature sensor varies by model/region - not all M400/M600 have it
 const M_SERIES_FEATURES: DeviceFeatures = {
   ...BASE_IOT_FEATURES,
-  hasTemperatureSensor: true,
+  hasTemperatureSensor: false,
   hasLEDControl: true,
   supportedCleaningModes: [
     'regular',
@@ -59,9 +60,10 @@ const M_SERIES_FEATURES: DeviceFeatures = {
   ],
 };
 // Liberty series features
+// Note: Temperature sensor varies by model/region
 const LIBERTY_FEATURES: DeviceFeatures = {
   ...BASE_IOT_FEATURES,
-  hasTemperatureSensor: true,
+  hasTemperatureSensor: false,
   hasWaterQualitySensor: false,
   hasLEDControl: true,
   supportedCleaningModes: ['regular', 'floor', 'wall', 'ultra', 'short'],
