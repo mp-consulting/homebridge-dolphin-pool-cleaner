@@ -22,7 +22,7 @@ const CLEANING_ROBOT_STATES = ['scanning', 'cleaning', 'running', 'active'];
 /**
  * Finished states that indicate cleaning has stopped
  */
-const FINISHED_ROBOT_STATES = ['finished', 'idle', 'off'];
+const FINISHED_ROBOT_STATES = ['finished', 'idle', 'off', 'notconnected'];
 
 /**
  * Map API mode strings to internal mode names
@@ -44,11 +44,18 @@ const MODE_STRING_MAP: Record<string, string> = {
 };
 
 /**
+ * PWS states that indicate NOT cleaning
+ */
+const IDLE_PWS_STATES = ['off', 'idle', 'holdweekly', 'holddelay', 'programming', 'error'];
+
+/**
  * Map PWS state strings to numeric values
  */
 const PWS_STATE_MAP: Record<string, number> = {
   off: PWS_STATES.OFF,
   idle: PWS_STATES.IDLE,
+  holdweekly: PWS_STATES.IDLE,
+  holddelay: PWS_STATES.IDLE,
   programming: PWS_STATES.PROGRAMMING,
   cleaning: PWS_STATES.CLEANING,
   error: PWS_STATES.ERROR,
@@ -135,6 +142,13 @@ function parseNewFormat(reported: RawShadowReported): Partial<ParsedRobotState> 
   if (reported.systemState) {
     const sysPwsState = reported.systemState.pwsState?.toLowerCase();
 
+    // Check PWS state first - idle states mean not cleaning
+    if (sysPwsState && IDLE_PWS_STATES.includes(sysPwsState)) {
+      state.isCleaning = false;
+    } else if (sysPwsState === 'cleaning') {
+      state.isCleaning = true;
+    }
+
     // Check for robotState inside systemState
     const sysRobotState = reported.systemState.robotState;
     if (sysRobotState) {
@@ -171,11 +185,13 @@ function parseNewFormat(reported: RawShadowReported): Partial<ParsedRobotState> 
   // Parse cycle info
   if (reported.cycleInfo) {
     const cycleStartTime = reported.cycleInfo.cycleStartTimeUTC || reported.cycleInfo.cycleStartTime;
-    if (cycleStartTime) {
+    // Only consider valid timestamps (non-zero, reasonable range)
+    if (cycleStartTime && cycleStartTime > 1000000000) {
       const now = Math.floor(Date.now() / 1000);
       const cycleTime = reported.cycleInfo.cleaningMode?.cycleTime || 120;
       const elapsedMinutes = (now - cycleStartTime) / 60;
 
+      // Only mark as cleaning if cycle started recently and is within duration
       if (elapsedMinutes >= 0 && elapsedMinutes < cycleTime) {
         state.isCleaning = true;
         state.cycleStartTime = new Date(cycleStartTime * 1000);
