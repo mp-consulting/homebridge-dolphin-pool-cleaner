@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.7] - 2026-01-19
+
+### Changed
+
+- **Major refactoring** of codebase for improved maintainability
+  - Extracted authentication into dedicated `AuthenticationManager` and `CredentialManager` classes
+  - Extracted shadow parsing into `parsers/` module with unified `parseShadowState()` function
+  - Extracted BLE command building into `protocol/commandBuilder.ts`
+  - Created custom error classes with error codes in `utils/errors.ts`
+  - Reduced `MaytronicsAPI` from 622 to ~390 lines
+  - Reduced `MQTTClient` from 525 to ~330 lines
+  - Reduced `DolphinDevice` from 680 to ~240 lines
+- Modernized `homebridge-ui/server.js` with native `fetch` API (removed curl dependency)
+- Reorganized `homebridge-ui/public/wizard.js` with centralized state and DOM management
+- Replaced all `any` types with proper TypeScript types
+
+### Added
+
+- README documentation for all `src/` modules explaining architecture and usage
+- New modules: `src/api/auth/`, `src/parsers/`, `src/protocol/`, `src/utils/`
+- Proper TypeScript interfaces for shadow state, filter status, and fault info
+
+### Fixed
+
+- Security improvement: removed shell command injection risk in UI server
+
 ## [1.0.6] - 2026-01-18
 
 ### Changed
@@ -124,6 +150,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Uses AWS SDK v3 for Cognito and IoT
 - MQTT 5.x for real-time communication
 
+[1.0.7]: https://github.com/mp-consulting/homebridge-dolphin-pool-cleaner/releases/tag/v1.0.7
 [1.0.6]: https://github.com/mp-consulting/homebridge-dolphin-pool-cleaner/releases/tag/v1.0.6
 [1.0.5]: https://github.com/mp-consulting/homebridge-dolphin-pool-cleaner/releases/tag/v1.0.5
 [1.0.4]: https://github.com/mp-consulting/homebridge-dolphin-pool-cleaner/releases/tag/v1.0.4

@@ -210,6 +210,22 @@ npm link
 npm run watch
 ```
 
+### Project Structure
+
+```
+src/
+├── api/              # Maytronics API client and MQTT
+│   └── auth/         # Authentication (Cognito, credentials)
+├── devices/          # Robot device representation
+├── accessories/      # HomeKit accessory implementation
+├── parsers/          # Shadow state parsing
+├── protocol/         # BLE command building
+├── config/           # Constants and configuration
+└── utils/            # Error handling utilities
+```
+
+Each module has a README with detailed documentation.
+
 ### Debug Scripts
 
 ```bash
