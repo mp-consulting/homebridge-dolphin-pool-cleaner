@@ -36,19 +36,20 @@ export const MQTT_TOPICS = {
   DYNAMIC_CHANNEL: 'Maytronics/%s/main',
 };
 // Cleaning modes with their duration in minutes
-export const CLEANING_MODES: Record<string, { name: string; duration: number; value: number }> = {
-  regular: { name: 'All Surfaces', duration: 120, value: 0 },
-  short: { name: 'Fast Mode', duration: 60, value: 1 },
-  floor: { name: 'Floor Only', duration: 120, value: 2 },
-  wall: { name: 'Walls Only', duration: 120, value: 3 },
-  water: { name: 'Waterline', duration: 120, value: 4 },
-  ultra: { name: 'Ultra Clean', duration: 120, value: 5 },
-  cove: { name: 'Cove', duration: 120, value: 6 },
-  spot: { name: 'Spot Clean', duration: 120, value: 7 },
-  tictac: { name: 'TicTac', duration: 600, value: 8 },
-  pickup: { name: 'Pickup', duration: 5, value: 9 },
-  custom: { name: 'Custom', duration: 120, value: 10 },
-  stairs: { name: 'Stairs', duration: 120, value: 11 },
+// The 'apiMode' field is the string value expected by the shadow update API
+export const CLEANING_MODES: Record<string, { name: string; duration: number; apiMode: string }> = {
+  all: { name: 'All Surfaces', duration: 120, apiMode: 'all' },
+  short: { name: 'Fast Mode', duration: 60, apiMode: 'short' },
+  floor: { name: 'Floor Only', duration: 120, apiMode: 'floor' },
+  wall: { name: 'Walls Only', duration: 120, apiMode: 'wall' },
+  water: { name: 'Waterline', duration: 120, apiMode: 'water' },
+  ultra: { name: 'Ultra Clean', duration: 120, apiMode: 'ultra' },
+  cove: { name: 'Cove', duration: 120, apiMode: 'cove' },
+  spot: { name: 'Spot Clean', duration: 120, apiMode: 'spot' },
+  tictac: { name: 'TicTac', duration: 600, apiMode: 'tictac' },
+  pickup: { name: 'Pickup', duration: 5, apiMode: 'pickup' },
+  custom: { name: 'Custom', duration: 120, apiMode: 'custom' },
+  stairs: { name: 'Stairs', duration: 120, apiMode: 'stairs' },
 };
 // Robot states
 export const ROBOT_STATES = {
@@ -76,6 +77,14 @@ export const PWS_STATES = {
 // Polling intervals
 export const DEFAULT_POLLING_INTERVAL = 60; // seconds
 export const MIN_POLLING_INTERVAL = 30; // seconds
+
+// Timeout values
+export const SHADOW_TIMEOUT_MS = 10000; // 10 seconds for shadow operations
+export const API_TIMEOUT_MS = 15000; // 15 seconds for API calls
+
+// Serial number
+export const SERIAL_NUMBER_LENGTH = 8; // Truncated serial for AWS IoT
+
 // Credential refresh timing
 export const CREDENTIAL_REFRESH_BUFFER_MS = 60 * 60 * 1000; // 1 hour before expiry
 //# sourceMappingURL=constants.js.map
