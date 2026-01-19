@@ -13,5 +13,4 @@ export type {
   RawShadowState,
 } from '../parsers/types.js';
 
-// Export RobotState as alias for backward compatibility
-export type { ParsedRobotState as RobotState } from '../parsers/types.js';
+// Note: RobotState is exported from dolphinDevice.ts for backward compatibility
