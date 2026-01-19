@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fixed incorrect `isCleaning=true` when robot is idle (`holdWeekly`, `notConnected` states)
 - Fixed timestamp validation to ignore `cycleStartTime=0` (no active cycle)
+- Disabled temperature sensor by default for M-Series (not all models have it)
 - Security improvement: removed shell command injection risk in UI server
 
 ## [1.0.6] - 2026-01-18
