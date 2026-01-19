@@ -20,15 +20,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Modernized `homebridge-ui/server.js` with native `fetch` API (removed curl dependency)
 - Reorganized `homebridge-ui/public/wizard.js` with centralized state and DOM management
 - Replaced all `any` types with proper TypeScript types
+- Replaced magic numbers with named constants for better code readability
 
 ### Added
 
 - README documentation for all `src/` modules explaining architecture and usage
 - New modules: `src/api/auth/`, `src/parsers/`, `src/protocol/`, `src/utils/`
 - Proper TypeScript interfaces for shadow state, filter status, and fault info
+- Named constants for MQTT settings, timeouts, timestamps, and error codes
 
 ### Fixed
 
+- Fixed incorrect `isCleaning=true` when robot is idle (`holdWeekly`, `notConnected` states)
+- Fixed timestamp validation to ignore `cycleStartTime=0` (no active cycle)
 - Security improvement: removed shell command injection risk in UI server
 
 ## [1.0.6] - 2026-01-18
