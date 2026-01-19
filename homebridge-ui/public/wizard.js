@@ -156,7 +156,6 @@
     get pollingInterval() { return document.getElementById('polling-interval'); },
     get enableTemperature() { return document.getElementById('enable-temperature'); },
     get enableFilter() { return document.getElementById('enable-filter'); },
-    get robotName() { return document.getElementById('robot-name'); },
     get robotSerial() { return document.getElementById('robot-serial'); },
     get robotModel() { return document.getElementById('robot-model'); },
     get robotDeviceType() { return document.getElementById('robot-device-type'); },
@@ -299,12 +298,11 @@
   }
 
   function updateRobotDisplay(result) {
-    dom.robotName.textContent = result.robotName;
     dom.robotSerial.textContent = result.serialNumber;
     dom.displayName.value = result.robotName;
 
     if (dom.robotModel) {
-      dom.robotModel.textContent = result.robotName || 'Dolphin Robot';
+      dom.robotModel.textContent = result.model || result.robotName || 'Dolphin Robot';
     }
     if (dom.robotDeviceType) {
       dom.robotDeviceType.textContent = getDeviceTypeLabel(result.deviceType);

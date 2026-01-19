@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.8] - 2026-01-19
+
+### Changed
+
+- Redesigned robot configuration step with 2-column layout
+  - Left column: Robot details (image, display name, serial, model, device type)
+  - Right column: Settings (cleaning mode, polling interval, sensors)
+- Increased robot image size for better visibility (200x150px)
+- Moved Display Name field into the robot card for better UX
+
 ## [1.0.7] - 2026-01-19
 
 ### Changed
