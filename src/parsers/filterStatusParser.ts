@@ -4,11 +4,7 @@
  * Parses filter status from various shadow formats.
  */
 import type { FilterData, FilterStatus } from './types.js';
-
-/**
- * Threshold for numeric filter state (percentage above which filter needs cleaning)
- */
-const FILTER_NEEDS_CLEANING_THRESHOLD = 80;
+import { FILTER_NEEDS_CLEANING_THRESHOLD } from '../config/constants.js';
 
 /**
  * Parse filter status from shadow data

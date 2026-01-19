@@ -87,4 +87,32 @@ export const SERIAL_NUMBER_LENGTH = 8; // Truncated serial for AWS IoT
 
 // Credential refresh timing
 export const CREDENTIAL_REFRESH_BUFFER_MS = 60 * 60 * 1000; // 1 hour before expiry
-//# sourceMappingURL=constants.js.map
+
+// MQTT connection settings
+export const MQTT_RECONNECT_PERIOD_MS = 5000;
+export const MQTT_CONNECT_TIMEOUT_MS = 30000;
+export const MQTT_KEEPALIVE_SECONDS = 30;
+
+// Time conversion constants
+export const MILLISECONDS_PER_SECOND = 1000;
+export const SECONDS_PER_MINUTE = 60;
+export const DEFAULT_CYCLE_TIME_MINUTES = 120;
+
+// State refresh delay after commands
+export const STATE_REFRESH_DELAY_MS = 3000;
+
+// Timestamp validation
+export const MIN_VALID_UNIX_TIMESTAMP = 1000000000; // Sept 2001
+
+// Error codes
+export const ERROR_CODE_NOT_APPLICABLE = 65535;
+export const ERROR_CODE_NO_ERROR = 255;
+
+// Filter status
+export const FILTER_NEEDS_CLEANING_THRESHOLD = 80; // percent
+
+// AWS Signature
+export const AWS_SIGNATURE_EXPIRY_SECONDS = '86400'; // 1 day
+
+// Debug log preview lengths
+export const DEBUG_LOG_PREVIEW_LENGTH = 200;

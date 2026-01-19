@@ -21,7 +21,15 @@ import type { Logger } from 'homebridge';
 import type { AWSIoTCredentials } from './auth/types.js';
 import type { RawShadowState } from '../parsers/types.js';
 import { buildCommand } from '../protocol/commandBuilder.js';
-import { SERIAL_NUMBER_LENGTH, SHADOW_TIMEOUT_MS } from '../config/constants.js';
+import {
+  SERIAL_NUMBER_LENGTH,
+  SHADOW_TIMEOUT_MS,
+  MQTT_RECONNECT_PERIOD_MS,
+  MQTT_CONNECT_TIMEOUT_MS,
+  MQTT_KEEPALIVE_SECONDS,
+  AWS_SIGNATURE_EXPIRY_SECONDS,
+  DEBUG_LOG_PREVIEW_LENGTH,
+} from '../config/constants.js';
 import { MQTTError, ErrorCode } from '../utils/errors.js';
 
 export interface MQTTClientConfig {
@@ -78,9 +86,9 @@ export class MQTTClient extends EventEmitter {
         this.client = mqtt.connect(signedUrl, {
           clientId,
           clean: true,
-          reconnectPeriod: 5000,
-          connectTimeout: 30000,
-          keepalive: 30,
+          reconnectPeriod: MQTT_RECONNECT_PERIOD_MS,
+          connectTimeout: MQTT_CONNECT_TIMEOUT_MS,
+          keepalive: MQTT_KEEPALIVE_SECONDS,
           protocol: 'wss',
           protocolVersion: 4,
           rejectUnauthorized: true,
@@ -149,7 +157,7 @@ export class MQTTClient extends EventEmitter {
       ['X-Amz-Algorithm', algorithm],
       ['X-Amz-Credential', `${this.credentials.accessKeyId}/${credentialScope}`],
       ['X-Amz-Date', amzDate],
-      ['X-Amz-Expires', '86400'],
+      ['X-Amz-Expires', AWS_SIGNATURE_EXPIRY_SECONDS],
       ['X-Amz-SignedHeaders', 'host'],
     ];
 
@@ -249,7 +257,7 @@ export class MQTTClient extends EventEmitter {
   private handleMessage(topic: string, payload: Buffer): void {
     try {
       const message = JSON.parse(payload.toString());
-      this.log.debug(`MQTT message on ${topic}:`, JSON.stringify(message).substring(0, 200));
+      this.log.debug(`MQTT message on ${topic}:`, JSON.stringify(message).substring(0, DEBUG_LOG_PREVIEW_LENGTH));
 
       if (topic.includes('/shadow/get/accepted') || topic.includes('/shadow/update/accepted')) {
         this.currentShadow = message as RawShadowState;
@@ -360,7 +368,7 @@ export class MQTTClient extends EventEmitter {
       const payload = JSON.stringify({ state: { desired } });
       const topic = `$aws/things/${this.truncatedSerial}/shadow/update`;
       this.client!.publish(topic, payload, { qos: 1 });
-      this.log.debug(`Published shadow update on ${topic}:`, payload.substring(0, 200));
+      this.log.debug(`Published shadow update on ${topic}:`, payload.substring(0, DEBUG_LOG_PREVIEW_LENGTH));
     });
   }
 

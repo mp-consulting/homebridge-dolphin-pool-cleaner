@@ -6,7 +6,12 @@
  */
 import { EventEmitter } from 'events';
 import { getDeviceFeatures, getDeviceModelName, type DeviceFeatures } from './deviceCatalog.js';
-import { ROBOT_STATES, CLEANING_MODES } from '../config/constants.js';
+import {
+  ROBOT_STATES,
+  CLEANING_MODES,
+  MILLISECONDS_PER_SECOND,
+  STATE_REFRESH_DELAY_MS,
+} from '../config/constants.js';
 import {
   parseShadowState,
   getShadowVersion,
@@ -79,7 +84,7 @@ export class DolphinDevice extends EventEmitter {
     // Start polling
     this.pollingTimer = setInterval(async () => {
       await this.refreshState();
-    }, this.pollingInterval * 1000);
+    }, this.pollingInterval * MILLISECONDS_PER_SECOND);
   }
 
   /**
@@ -172,7 +177,7 @@ export class DolphinDevice extends EventEmitter {
       this.emit('stateChange', this.state);
 
       // Refresh state after a short delay
-      setTimeout(() => this.refreshState(), 3000);
+      setTimeout(() => this.refreshState(), STATE_REFRESH_DELAY_MS);
     }
 
     return success;
@@ -193,7 +198,7 @@ export class DolphinDevice extends EventEmitter {
       this.emit('stateChange', this.state);
 
       // Refresh state after a short delay
-      setTimeout(() => this.refreshState(), 3000);
+      setTimeout(() => this.refreshState(), STATE_REFRESH_DELAY_MS);
     }
 
     return success;
@@ -232,7 +237,7 @@ export class DolphinDevice extends EventEmitter {
       this.emit('stateChange', this.state);
 
       // Refresh state after a short delay
-      setTimeout(() => this.refreshState(), 3000);
+      setTimeout(() => this.refreshState(), STATE_REFRESH_DELAY_MS);
     }
 
     return success;

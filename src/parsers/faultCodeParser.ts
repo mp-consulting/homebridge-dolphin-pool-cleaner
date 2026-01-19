@@ -4,6 +4,7 @@
  * Parses and validates fault codes from shadow state.
  */
 import type { FaultInfo, RobotErrorData, SystemStateData } from './types.js';
+import { ERROR_CODE_NOT_APPLICABLE, ERROR_CODE_NO_ERROR } from '../config/constants.js';
 
 /**
  * Fault code descriptions
@@ -20,7 +21,7 @@ const FAULT_DESCRIPTIONS: Record<number, string> = {
 /**
  * Error codes that indicate "no error"
  */
-const NO_ERROR_CODES = [0, 255, 65535];
+const NO_ERROR_CODES = [0, ERROR_CODE_NO_ERROR, ERROR_CODE_NOT_APPLICABLE];
 
 /**
  * Get fault description from code
@@ -64,8 +65,8 @@ export function isCurrentSessionError(
     return true;
   }
 
-  // 65535 means "not applicable", treat as current
-  if (errorTurnOnCount === 65535) {
+  // ERROR_CODE_NOT_APPLICABLE means "not applicable", treat as current
+  if (errorTurnOnCount === ERROR_CODE_NOT_APPLICABLE) {
     return true;
   }
 

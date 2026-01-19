@@ -19,6 +19,8 @@ import {
   COGNITO,
   IOT_ENDPOINTS,
   DEFAULT_IOT_REGION,
+  API_TIMEOUT_MS,
+  DEBUG_LOG_PREVIEW_LENGTH,
 } from '../../config/constants.js';
 import { AuthError, ErrorCode } from '../../utils/errors.js';
 import { CredentialManager } from './credentialManager.js';
@@ -44,7 +46,7 @@ export class AuthenticationManager {
 
     this.httpClient = axios.create({
       baseURL: MAYTRONICS_API.BASE_URL,
-      timeout: 15000,
+      timeout: API_TIMEOUT_MS,
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
         AppKey: MAYTRONICS_API.APP_KEY,
@@ -261,7 +263,7 @@ export class AuthenticationManager {
 
       this.log.debug(
         'AWS credentials response:',
-        JSON.stringify(response.data).substring(0, 500),
+        JSON.stringify(response.data).substring(0, DEBUG_LOG_PREVIEW_LENGTH),
       );
 
       if (response.data.Status !== '1') {

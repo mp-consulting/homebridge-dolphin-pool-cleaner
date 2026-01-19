@@ -4,7 +4,14 @@
  * Unified parser for AWS IoT Thing Shadow state.
  * Handles both new IoT format and legacy BLE format.
  */
-import { PWS_STATES, ROBOT_STATES } from '../config/constants.js';
+import {
+  PWS_STATES,
+  ROBOT_STATES,
+  DEFAULT_CYCLE_TIME_MINUTES,
+  MIN_VALID_UNIX_TIMESTAMP,
+  MILLISECONDS_PER_SECOND,
+  SECONDS_PER_MINUTE,
+} from '../config/constants.js';
 import { parseAllFaults, parseFaultsHexString } from './faultCodeParser.js';
 import { parseLegacyFilterStatus, parseFilterStatus } from './filterStatusParser.js';
 import type {
@@ -98,7 +105,7 @@ export function createDefaultState(): ParsedRobotState {
     pwsState: PWS_STATES.OFF,
     isCleaning: false,
     cleaningMode: 'all',
-    cycleTime: 120,
+    cycleTime: DEFAULT_CYCLE_TIME_MINUTES,
     cycleTimeRemaining: 0,
     filterStatus: 'ok',
   };
@@ -186,15 +193,15 @@ function parseNewFormat(reported: RawShadowReported): Partial<ParsedRobotState> 
   if (reported.cycleInfo) {
     const cycleStartTime = reported.cycleInfo.cycleStartTimeUTC || reported.cycleInfo.cycleStartTime;
     // Only consider valid timestamps (non-zero, reasonable range)
-    if (cycleStartTime && cycleStartTime > 1000000000) {
-      const now = Math.floor(Date.now() / 1000);
-      const cycleTime = reported.cycleInfo.cleaningMode?.cycleTime || 120;
-      const elapsedMinutes = (now - cycleStartTime) / 60;
+    if (cycleStartTime && cycleStartTime > MIN_VALID_UNIX_TIMESTAMP) {
+      const now = Math.floor(Date.now() / MILLISECONDS_PER_SECOND);
+      const cycleTime = reported.cycleInfo.cleaningMode?.cycleTime || DEFAULT_CYCLE_TIME_MINUTES;
+      const elapsedMinutes = (now - cycleStartTime) / SECONDS_PER_MINUTE;
 
       // Only mark as cleaning if cycle started recently and is within duration
       if (elapsedMinutes >= 0 && elapsedMinutes < cycleTime) {
         state.isCleaning = true;
-        state.cycleStartTime = new Date(cycleStartTime * 1000);
+        state.cycleStartTime = new Date(cycleStartTime * MILLISECONDS_PER_SECOND);
         state.cycleTimeRemaining = Math.max(0, cycleTime - elapsedMinutes);
       }
     }
@@ -219,7 +226,7 @@ function parseNewFormat(reported: RawShadowReported): Partial<ParsedRobotState> 
     // Parse cycle time remaining (alternative format)
     if (reported.cycleInfo.cycleTimeRemaining) {
       const remaining = reported.cycleInfo.cycleTimeRemaining;
-      state.cycleTimeRemaining = (remaining.hours || 0) * 60 + (remaining.minutes || 0);
+      state.cycleTimeRemaining = (remaining.hours || 0) * SECONDS_PER_MINUTE + (remaining.minutes || 0);
     }
   }
 
@@ -262,7 +269,7 @@ function parseNewFormat(reported: RawShadowReported): Partial<ParsedRobotState> 
     state.delayEnabled = reported.delayedOperation.enabled;
     if (reported.delayedOperation.time) {
       state.delayTime =
-        (reported.delayedOperation.time.hours || 0) * 60 +
+        (reported.delayedOperation.time.hours || 0) * SECONDS_PER_MINUTE +
         (reported.delayedOperation.time.minutes || 0);
     }
   }
@@ -313,7 +320,7 @@ function parseLegacyFormat(reported: RawShadowReported): Partial<ParsedRobotStat
       if (reported.cycle_info.length >= 4) {
         const elapsed = parseInt(reported.cycle_info.substring(0, 4), 16);
         if (!isNaN(elapsed)) {
-          const totalMinutes = state.cycleTime || 120;
+          const totalMinutes = state.cycleTime || DEFAULT_CYCLE_TIME_MINUTES;
           state.cycleTimeRemaining = Math.max(0, totalMinutes - elapsed);
         }
       }
