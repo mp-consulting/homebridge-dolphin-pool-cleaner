@@ -179,7 +179,7 @@ export class MQTTClient extends EventEmitter {
       payloadHash,
     ].join('\n');
 
-    this.log.debug('Canonical request:', canonicalRequest);
+    this.log.debug('Canonical request constructed for SigV4 signing');
 
     const hashedCanonicalRequest = createHash('sha256').update(canonicalRequest).digest('hex');
     const stringToSign = [algorithm, amzDate, credentialScope, hashedCanonicalRequest].join('\n');
@@ -291,35 +291,42 @@ export class MQTTClient extends EventEmitter {
     return new Promise((resolve, reject) => {
       let settled = false;
 
-      const timeout = setTimeout(() => {
-        if (!settled) {
-          settled = true;
-          this.removeAllListeners('shadowUpdate');
-          this.removeAllListeners('shadowRejected');
-          reject(new MQTTError(ErrorCode.MQTT_SHADOW_TIMEOUT, 'Shadow request timeout'));
-        }
-      }, SHADOW_TIMEOUT_MS);
+      const cleanup = () => {
+        this.removeListener('shadowUpdate', onUpdate);
+        this.removeListener('shadowRejected', onRejected);
+      };
 
-      this.once('shadowUpdate', (shadow: RawShadowState) => {
+      const onUpdate = (shadow: RawShadowState) => {
         if (!settled) {
           settled = true;
           clearTimeout(timeout);
-          this.removeAllListeners('shadowRejected');
+          cleanup();
           resolve(shadow);
         }
-      });
+      };
 
-      this.once('shadowRejected', (error: unknown) => {
+      const onRejected = (error: unknown) => {
         if (!settled) {
           settled = true;
           clearTimeout(timeout);
-          this.removeAllListeners('shadowUpdate');
+          cleanup();
           reject(new MQTTError(
             ErrorCode.MQTT_SHADOW_REJECTED,
             `Shadow request rejected: ${JSON.stringify(error)}`,
           ));
         }
-      });
+      };
+
+      const timeout = setTimeout(() => {
+        if (!settled) {
+          settled = true;
+          cleanup();
+          reject(new MQTTError(ErrorCode.MQTT_SHADOW_TIMEOUT, 'Shadow request timeout'));
+        }
+      }, SHADOW_TIMEOUT_MS);
+
+      this.once('shadowUpdate', onUpdate);
+      this.once('shadowRejected', onRejected);
 
       const topic = `$aws/things/${this.truncatedSerial}/shadow/get`;
       this.client!.publish(topic, '', { qos: 1 });
@@ -336,34 +343,41 @@ export class MQTTClient extends EventEmitter {
     return new Promise<boolean>((resolve) => {
       let settled = false;
 
+      const cleanup = () => {
+        this.removeListener('shadowUpdate', onUpdate);
+        this.removeListener('shadowRejected', onRejected);
+      };
+
+      const onUpdate = () => {
+        if (!settled) {
+          settled = true;
+          clearTimeout(timeout);
+          cleanup();
+          resolve(true);
+        }
+      };
+
+      const onRejected = (error: unknown) => {
+        if (!settled) {
+          settled = true;
+          clearTimeout(timeout);
+          cleanup();
+          this.log.error('Shadow update rejected:', error);
+          resolve(false);
+        }
+      };
+
       const timeout = setTimeout(() => {
         if (!settled) {
           settled = true;
-          this.removeAllListeners('shadowUpdate');
-          this.removeAllListeners('shadowRejected');
+          cleanup();
           this.log.error('Shadow update timeout');
           resolve(false);
         }
       }, SHADOW_TIMEOUT_MS);
 
-      this.once('shadowUpdate', () => {
-        if (!settled) {
-          settled = true;
-          clearTimeout(timeout);
-          this.removeAllListeners('shadowRejected');
-          resolve(true);
-        }
-      });
-
-      this.once('shadowRejected', (error: unknown) => {
-        if (!settled) {
-          settled = true;
-          clearTimeout(timeout);
-          this.removeAllListeners('shadowUpdate');
-          this.log.error('Shadow update rejected:', error);
-          resolve(false);
-        }
-      });
+      this.once('shadowUpdate', onUpdate);
+      this.once('shadowRejected', onRejected);
 
       const payload = JSON.stringify({ state: { desired } });
       const topic = `$aws/things/${this.truncatedSerial}/shadow/update`;

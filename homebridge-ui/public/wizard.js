@@ -209,6 +209,37 @@
   }
 
   // ============================================================================
+  // Security Helpers
+  // ============================================================================
+
+  function escapeHtml(str) {
+    if (str === null || str === undefined) {
+      return '';
+    }
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  function sanitizeUrl(url) {
+    if (!url || typeof url !== 'string') {
+      return '';
+    }
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol === 'https:' || parsed.protocol === 'http:') {
+        return url;
+      }
+    } catch (_e) {
+      // Invalid URL
+    }
+    return '';
+  }
+
+  // ============================================================================
   // UI Helpers
   // ============================================================================
 
@@ -273,9 +304,10 @@
   function updateRobotImage(imageUrl) {
     const robotImage = dom.robotImage;
     const svgContainer = dom.robotSvgContainer;
+    const safeUrl = sanitizeUrl(imageUrl);
 
-    if (imageUrl && robotImage) {
-      robotImage.src = imageUrl;
+    if (safeUrl && robotImage) {
+      robotImage.src = safeUrl;
       robotImage.style.display = 'block';
       if (svgContainer) {
         svgContainer.style.display = 'none';
@@ -556,8 +588,13 @@
     const card = document.createElement('div');
     card.className = 'robot-card robot-card-clickable';
 
-    const imageHtml = device.robotImageUrl
-      ? `<img src="${device.robotImageUrl}" alt="${device.name}" class="robot-image"
+    const safeName = escapeHtml(device.name || 'Dolphin Robot');
+    const safeSerial = escapeHtml(device.serialNumber || '-');
+    const safeEmail = escapeHtml(email || '-');
+    const safeImageUrl = sanitizeUrl(device.robotImageUrl);
+
+    const imageHtml = safeImageUrl
+      ? `<img src="${escapeHtml(safeImageUrl)}" alt="${safeName}" class="robot-image"
              onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
          <div class="robot-svg" style="display: none;">${ROBOT_SVG}</div>`
       : `<div class="robot-svg">${ROBOT_SVG}</div>`;
@@ -577,23 +614,23 @@
         </button>
       </div>
       <div class="robot-card-content">
-        <h3 class="robot-card-name">${device.name || 'Dolphin Robot'}</h3>
+        <h3 class="robot-card-name">${safeName}</h3>
         <div class="robot-card-details">
           <div class="robot-detail-item">
             <span class="detail-label">Serial Number</span>
-            <span class="detail-value">${device.serialNumber || '-'}</span>
+            <span class="detail-value">${safeSerial}</span>
           </div>
           <div class="robot-detail-item">
             <span class="detail-label">Device Type</span>
-            <span class="detail-value">${getDeviceTypeLabel(device.deviceType)}</span>
+            <span class="detail-value">${escapeHtml(getDeviceTypeLabel(device.deviceType))}</span>
           </div>
           <div class="robot-detail-item">
             <span class="detail-label">Account</span>
-            <span class="detail-value">${email || '-'}</span>
+            <span class="detail-value">${safeEmail}</span>
           </div>
           <div class="robot-detail-item">
             <span class="detail-label">Cleaning Mode</span>
-            <span class="detail-value">${getCleaningModeText(device.cleaningMode)}</span>
+            <span class="detail-value">${escapeHtml(getCleaningModeText(device.cleaningMode))}</span>
           </div>
         </div>
       </div>

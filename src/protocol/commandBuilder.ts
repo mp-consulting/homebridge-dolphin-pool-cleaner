@@ -106,7 +106,12 @@ export function buildCommand(commandName: string, data?: string): BuiltCommand |
 
   // Data length (2 bytes, little-endian)
   const dataLength = data ? Math.floor(data.length / 2) : 0;
-  message += dataLength.toString(16).padStart(4, '0');
+  if (dataLength > 0xffff) {
+    return undefined;
+  }
+  const lenLowByte = (dataLength & 0xff).toString(16).padStart(2, '0');
+  const lenHighByte = ((dataLength >> 8) & 0xff).toString(16).padStart(2, '0');
+  message += lenLowByte + lenHighByte;
 
   // Data payload
   if (data) {
