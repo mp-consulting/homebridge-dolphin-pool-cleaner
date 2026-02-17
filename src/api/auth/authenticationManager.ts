@@ -20,7 +20,6 @@ import {
   IOT_ENDPOINTS,
   DEFAULT_IOT_REGION,
   API_TIMEOUT_MS,
-  DEBUG_LOG_PREVIEW_LENGTH,
 } from '../../config/constants.js';
 import { AuthError, ErrorCode } from '../../utils/errors.js';
 import { CredentialManager } from './credentialManager.js';
