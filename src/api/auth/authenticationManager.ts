@@ -262,8 +262,8 @@ export class AuthenticationManager {
       });
 
       this.log.debug(
-        'AWS credentials response:',
-        JSON.stringify(response.data).substring(0, DEBUG_LOG_PREVIEW_LENGTH),
+        'AWS credentials response received, status:',
+        response.data.Status,
       );
 
       if (response.data.Status !== '1') {
