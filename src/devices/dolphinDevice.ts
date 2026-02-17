@@ -26,9 +26,9 @@ import type { Logger } from 'homebridge';
 export type RobotState = ParsedRobotState;
 
 /**
- * Device configuration
+ * Device initialization configuration (required fields for runtime)
  */
-export interface DeviceConfig {
+export interface DeviceInitConfig {
   serialNumber: string;
   name: string;
   deviceType: number;
@@ -51,7 +51,7 @@ export class DolphinDevice extends EventEmitter {
   private state: ParsedRobotState;
   private lastShadowVersion?: number;
 
-  constructor(config: DeviceConfig, api: MaytronicsAPI, log: Logger) {
+  constructor(config: DeviceInitConfig, api: MaytronicsAPI, log: Logger) {
     super();
     this.api = api;
     this.log = log;

@@ -239,18 +239,3 @@ export function parseAllFaults(
 
   return undefined;
 }
-
-/**
- * Check if there's a critical fault that should stop operation
- *
- * @param fault - Fault info to check
- * @returns true if this is a critical fault
- */
-export function hasCriticalFault(fault: FaultInfo | undefined): boolean {
-  if (!fault || !fault.isActive) {
-    return false;
-  }
-
-  // All active faults are considered critical
-  return true;
-}

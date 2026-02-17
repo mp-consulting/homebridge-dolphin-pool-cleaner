@@ -13,4 +13,3 @@ import { DolphinPoolCleanerPlatform } from './platform.js';
 export default (api: API): void => {
   api.registerPlatform(PLUGIN_NAME, PLATFORM_NAME, DolphinPoolCleanerPlatform);
 };
-//# sourceMappingURL=index.js.map

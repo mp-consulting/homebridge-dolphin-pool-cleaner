@@ -161,19 +161,3 @@ export function getErrorMessage(error: unknown): string {
   }
   return String(error);
 }
-
-/**
- * Helper to wrap unknown errors in PluginError
- */
-export function wrapError(
-  error: unknown,
-  code: ErrorCode = ErrorCode.UNKNOWN_ERROR,
-  message?: string,
-): PluginError {
-  if (error instanceof PluginError) {
-    return error;
-  }
-
-  const errorMessage = message || getErrorMessage(error);
-  return new PluginError(code, errorMessage, { cause: error });
-}

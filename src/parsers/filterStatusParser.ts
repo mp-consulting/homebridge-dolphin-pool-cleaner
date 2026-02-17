@@ -70,23 +70,3 @@ export function parseLegacyFilterStatus(filterState?: number): FilterStatus {
   }
   return filterState > 0 ? 'needs_cleaning' : 'ok';
 }
-
-/**
- * Convert filter status to numeric representation
- *
- * @param status - Filter status
- * @returns 0 for ok, 1 for needs_cleaning
- */
-export function filterStatusToNumber(status: FilterStatus): number {
-  return status === 'needs_cleaning' ? 1 : 0;
-}
-
-/**
- * Check if filter needs cleaning
- *
- * @param status - Filter status
- * @returns true if filter needs cleaning
- */
-export function filterNeedsCleaning(status: FilterStatus): boolean {
-  return status === 'needs_cleaning';
-}

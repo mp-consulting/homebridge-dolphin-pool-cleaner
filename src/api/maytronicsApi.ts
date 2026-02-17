@@ -209,93 +209,69 @@ export class MaytronicsAPI {
   }
 
   /**
-   * Send command to start the robot via shadow update
+   * Send a shadow command with standard error handling
    */
-  async startRobot(serialNumber: string, cleaningMode?: string): Promise<boolean> {
+  private async sendShadowCommand(
+    desired: Record<string, unknown>,
+    description: string,
+  ): Promise<boolean> {
     try {
       await this.ensureConnectedMQTT();
 
-      // If cleaning mode is specified, set it first
-      if (cleaningMode) {
-        await this.setCleaningMode(serialNumber, cleaningMode);
-      }
-
-      // Send start command via shadow update
-      const success = await this.mqttClient!.updateShadow({
-        systemState: { pwsState: 'on' },
-      });
-
+      const success = await this.mqttClient!.updateShadow(desired);
       if (success) {
-        this.log.debug(`Start command sent for ${serialNumber}`);
+        this.log.debug(description);
       }
       return success;
     } catch (error) {
-      this.log.error('Failed to send start command:', getErrorMessage(error));
+      this.log.error(`Failed: ${description}:`, getErrorMessage(error));
       return false;
     }
+  }
+
+  /**
+   * Send command to start the robot via shadow update
+   */
+  async startRobot(serialNumber: string, cleaningMode?: string): Promise<boolean> {
+    // If cleaning mode is specified, set it first
+    if (cleaningMode) {
+      await this.setCleaningMode(serialNumber, cleaningMode);
+    }
+
+    return this.sendShadowCommand(
+      { systemState: { pwsState: 'on' } },
+      `Start command sent for ${serialNumber}`,
+    );
   }
 
   /**
    * Send command to stop the robot via shadow update
    */
   async stopRobot(serialNumber: string): Promise<boolean> {
-    try {
-      await this.ensureConnectedMQTT();
-
-      const success = await this.mqttClient!.updateShadow({
-        systemState: { pwsState: 'off' },
-      });
-
-      if (success) {
-        this.log.debug(`Stop command sent for ${serialNumber}`);
-      }
-      return success;
-    } catch (error) {
-      this.log.error('Failed to send stop command:', getErrorMessage(error));
-      return false;
-    }
+    return this.sendShadowCommand(
+      { systemState: { pwsState: 'off' } },
+      `Stop command sent for ${serialNumber}`,
+    );
   }
 
   /**
    * Send command to set cleaning mode via shadow update
    */
   async setCleaningMode(serialNumber: string, mode: string): Promise<boolean> {
-    try {
-      await this.ensureConnectedMQTT();
-
-      const success = await this.mqttClient!.updateShadow({
-        cleaningMode: { mode },
-      });
-
-      if (success) {
-        this.log.debug(`Set cleaning mode to ${mode} for ${serialNumber}`);
-      }
-      return success;
-    } catch (error) {
-      this.log.error('Failed to set cleaning mode:', getErrorMessage(error));
-      return false;
-    }
+    return this.sendShadowCommand(
+      { cleaningMode: { mode } },
+      `Set cleaning mode to ${mode} for ${serialNumber}`,
+    );
   }
 
   /**
    * Send command to put robot in pickup mode via shadow update
    */
   async pickupRobot(serialNumber: string): Promise<boolean> {
-    try {
-      await this.ensureConnectedMQTT();
-
-      const success = await this.mqttClient!.updateShadow({
-        cleaningMode: { mode: 'pickup' },
-      });
-
-      if (success) {
-        this.log.debug(`Pickup command sent for ${serialNumber}`);
-      }
-      return success;
-    } catch (error) {
-      this.log.error('Failed to send pickup command:', getErrorMessage(error));
-      return false;
-    }
+    return this.sendShadowCommand(
+      { cleaningMode: { mode: 'pickup' } },
+      `Pickup command sent for ${serialNumber}`,
+    );
   }
 
   /**

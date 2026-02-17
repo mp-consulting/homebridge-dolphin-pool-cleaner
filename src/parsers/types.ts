@@ -198,11 +198,3 @@ export interface ParsedRobotState {
   delayEnabled?: boolean;
   delayTime?: number;
 }
-
-/**
- * State update result with change detection
- */
-export interface StateUpdateResult {
-  state: Partial<ParsedRobotState>;
-  hasChanges: boolean;
-}

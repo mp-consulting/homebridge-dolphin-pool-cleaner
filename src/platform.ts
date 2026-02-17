@@ -18,9 +18,10 @@ import {
   DEFAULT_POLLING_INTERVAL,
   MIN_POLLING_INTERVAL,
 } from './config/constants.js';
-import { MaytronicsAPI } from './api/maytronicsApi.js';
+import { MaytronicsAPI, type RobotInfo } from './api/maytronicsApi.js';
 import { DolphinDevice } from './devices/dolphinDevice.js';
 import { DolphinAccessory } from './accessories/dolphinAccessory.js';
+import { getErrorMessage } from './utils/errors.js';
 
 export interface DeviceConfig {
   serialNumber?: string;
@@ -91,132 +92,107 @@ export class DolphinPoolCleanerPlatform implements DynamicPlatformPlugin {
   async discoverDevices() {
     try {
       this.log.info('Discovering Dolphin pool robots...');
-      // Initialize API client with refresh token or email/password
-      this.api = new MaytronicsAPI(
-        this.config.email,
-        this.config.password,
-        this.log,
-        this.config.iotRegion,
-        this.config.refreshToken,
-      );
-      // Login and get robot info
-      const authResult = await this.api.login();
-      this.log.info(
-        `Found robot: ${authResult.robotName} (S/N: ${authResult.serialNumber})`,
-      );
-      // Get detailed robot info
-      const robots = await this.api.getRobots();
-      // Calculate polling interval
+
+      const robots = await this.initializeApi();
       const pollingInterval = Math.max(
         this.config.pollingInterval || DEFAULT_POLLING_INTERVAL,
         MIN_POLLING_INTERVAL,
       );
-      // Process each robot
+
       for (const robotInfo of robots) {
-        const serialNumber = robotInfo.serialNumber;
-        // Check for device-specific config
-        const deviceConfig = this.config.devices?.find(
-          (d) => d.serialNumber === serialNumber,
-        );
-        // Create device instance
-        const device = new DolphinDevice(
-          {
-            serialNumber,
-            name: deviceConfig?.name || robotInfo.name,
-            deviceType: robotInfo.deviceType,
-            pollingInterval,
-          },
-          this.api,
-          this.log,
-        );
-        this.devices.set(serialNumber, device);
-        // Generate unique ID
-        const uuid = this.homebridgeApi.hap.uuid.generate(serialNumber);
-        this.log.debug(`Generated UUID for ${serialNumber}: ${uuid}`);
-        this.log.debug(
-          `Cached accessories: ${Array.from(this.accessories.keys()).join(', ') || 'none'}`,
-        );
-        // Check if accessory already exists
-        const existingAccessory = this.accessories.get(uuid);
-        if (existingAccessory) {
-          // Accessory already exists - update it
-          this.log.info(
-            'Restoring existing accessory:',
-            existingAccessory.displayName,
-          );
-          // Update accessory context
-          existingAccessory.context.device = robotInfo;
-          existingAccessory.context.deviceConfig = deviceConfig;
-          // Create accessory handler
-          const handler = new DolphinAccessory(
-            this,
-            existingAccessory,
-            device,
-            deviceConfig,
-          );
-          this.accessoryHandlers.set(serialNumber, handler);
-          // Update accessory
-          this.homebridgeApi.updatePlatformAccessories([existingAccessory]);
-        } else {
-          // Create new accessory
-          this.log.info('Adding new accessory:', robotInfo.name);
-          const accessory = new this.homebridgeApi.platformAccessory(
-            robotInfo.name,
-            uuid,
-          );
-          // Store device info in context
-          accessory.context.device = robotInfo;
-          accessory.context.deviceConfig = deviceConfig;
-          // Create accessory handler
-          const handler = new DolphinAccessory(
-            this,
-            accessory,
-            device,
-            deviceConfig,
-          );
-          this.accessoryHandlers.set(serialNumber, handler);
-          // Register accessory - store in map first to avoid duplicate registration
-          this.accessories.set(uuid, accessory);
-          try {
-            this.homebridgeApi.registerPlatformAccessories(
-              PLUGIN_NAME,
-              PLATFORM_NAME,
-              [accessory],
-            );
-          } catch (regError) {
-            // This can happen if an old cached accessory exists with a different UUID
-            // The accessory should still work, just log the warning
-            this.log.warn(
-              'Accessory registration warning:',
-              regError instanceof Error ? regError.message : String(regError),
-            );
-          }
-        }
-        // Start device polling
-        await device.start();
+        await this.registerRobot(robotInfo, pollingInterval);
       }
-      // Remove stale accessories
-      const activeUUIDs = new Set(
-        robots.map((r) => this.homebridgeApi.hap.uuid.generate(r.serialNumber)),
-      );
-      for (const [uuid, accessory] of this.accessories) {
-        if (!activeUUIDs.has(uuid)) {
-          this.log.info('Removing stale accessory:', accessory.displayName);
-          this.homebridgeApi.unregisterPlatformAccessories(
-            PLUGIN_NAME,
-            PLATFORM_NAME,
-            [accessory],
-          );
-          this.accessories.delete(uuid);
-        }
-      }
+
+      this.removeStaleAccessories(robots);
       this.log.info(`Discovered ${robots.length} robot(s)`);
     } catch (error) {
-      this.log.error(
-        'Failed to discover devices:',
-        error instanceof Error ? error.message : String(error),
-      );
+      this.log.error('Failed to discover devices:', getErrorMessage(error));
+    }
+  }
+
+  /**
+   * Initialize API client and return robot list
+   */
+  private async initializeApi(): Promise<RobotInfo[]> {
+    this.api = new MaytronicsAPI(
+      this.config.email,
+      this.config.password,
+      this.log,
+      this.config.iotRegion,
+      this.config.refreshToken,
+    );
+
+    const authResult = await this.api.login();
+    this.log.info(
+      `Found robot: ${authResult.robotName} (S/N: ${authResult.serialNumber})`,
+    );
+
+    return this.api.getRobots();
+  }
+
+  /**
+   * Register or restore a single robot as a HomeKit accessory
+   */
+  private async registerRobot(robotInfo: RobotInfo, pollingInterval: number): Promise<void> {
+    const serialNumber = robotInfo.serialNumber;
+    const deviceConfig = this.config.devices?.find(
+      (d) => d.serialNumber === serialNumber,
+    );
+
+    const device = new DolphinDevice(
+      {
+        serialNumber,
+        name: deviceConfig?.name || robotInfo.name,
+        deviceType: robotInfo.deviceType,
+        pollingInterval,
+      },
+      this.api!,
+      this.log,
+    );
+    this.devices.set(serialNumber, device);
+
+    const uuid = this.homebridgeApi.hap.uuid.generate(serialNumber);
+    const existingAccessory = this.accessories.get(uuid);
+
+    if (existingAccessory) {
+      this.log.info('Restoring existing accessory:', existingAccessory.displayName);
+      existingAccessory.context.device = robotInfo;
+      existingAccessory.context.deviceConfig = deviceConfig;
+      const handler = new DolphinAccessory(this, existingAccessory, device, deviceConfig);
+      this.accessoryHandlers.set(serialNumber, handler);
+      this.homebridgeApi.updatePlatformAccessories([existingAccessory]);
+    } else {
+      this.log.info('Adding new accessory:', robotInfo.name);
+      const accessory = new this.homebridgeApi.platformAccessory(robotInfo.name, uuid);
+      accessory.context.device = robotInfo;
+      accessory.context.deviceConfig = deviceConfig;
+      const handler = new DolphinAccessory(this, accessory, device, deviceConfig);
+      this.accessoryHandlers.set(serialNumber, handler);
+      this.accessories.set(uuid, accessory);
+      try {
+        this.homebridgeApi.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
+      } catch (regError) {
+        this.log.warn('Accessory registration warning:', getErrorMessage(regError));
+      }
+    }
+
+    await device.start();
+  }
+
+  /**
+   * Remove cached accessories that no longer correspond to discovered robots
+   */
+  private removeStaleAccessories(robots: RobotInfo[]): void {
+    const activeUUIDs = new Set(
+      robots.map((r) => this.homebridgeApi.hap.uuid.generate(r.serialNumber)),
+    );
+
+    for (const [uuid, accessory] of this.accessories) {
+      if (!activeUUIDs.has(uuid)) {
+        this.log.info('Removing stale accessory:', accessory.displayName);
+        this.homebridgeApi.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
+        this.accessories.delete(uuid);
+      }
     }
   }
 }
-//# sourceMappingURL=platform.js.map

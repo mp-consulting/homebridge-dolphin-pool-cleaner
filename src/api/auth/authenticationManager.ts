@@ -21,7 +21,7 @@ import {
   DEFAULT_IOT_REGION,
   API_TIMEOUT_MS,
 } from '../../config/constants.js';
-import { AuthError, ErrorCode } from '../../utils/errors.js';
+import { AuthError, ErrorCode, getErrorMessage } from '../../utils/errors.js';
 import { CredentialManager } from './credentialManager.js';
 import type { AuthConfig, AWSIoTCredentials, LoginResult } from './types.js';
 
@@ -93,7 +93,7 @@ export class AuthenticationManager {
     } catch (error) {
       this.log.error(
         'Login failed:',
-        error instanceof Error ? error.message : String(error),
+        getErrorMessage(error),
       );
       throw error;
     }

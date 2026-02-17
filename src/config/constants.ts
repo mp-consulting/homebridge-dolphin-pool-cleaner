@@ -25,16 +25,6 @@ export const IOT_ENDPOINTS: Record<string, string> = {
 // Default IoT endpoint (production) - eu-west-1 per iOS app config
 export const DEFAULT_IOT_ENDPOINT = IOT_ENDPOINTS['eu-west-1'];
 export const DEFAULT_IOT_REGION = 'eu-west-1';
-// MQTT Topics for AWS IoT
-export const MQTT_TOPICS = {
-  SHADOW_UPDATE: '$aws/things/%s/shadow/update',
-  SHADOW_UPDATE_ACCEPTED: '$aws/things/%s/shadow/update/accepted',
-  SHADOW_UPDATE_REJECTED: '$aws/things/%s/shadow/update/rejected',
-  SHADOW_GET: '$aws/things/%s/shadow/get',
-  SHADOW_GET_ACCEPTED: '$aws/things/%s/shadow/get/accepted',
-  SHADOW_GET_REJECTED: '$aws/things/%s/shadow/get/rejected',
-  DYNAMIC_CHANNEL: 'Maytronics/%s/main',
-};
 // Cleaning modes with their duration in minutes
 // The 'apiMode' field is the string value expected by the shadow update API
 export const CLEANING_MODES: Record<string, { name: string; duration: number; apiMode: string }> = {
