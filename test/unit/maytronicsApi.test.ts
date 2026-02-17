@@ -90,11 +90,13 @@ describe('MaytronicsAPI', () => {
   });
 
   describe('getThingShadow', () => {
-    it('should throw when called before login', async () => {
+    it('should return undefined when called before login', async () => {
       const { MaytronicsAPI } = await import('../../src/api/maytronicsApi.js');
       const api = new MaytronicsAPI('test@example.com', 'password123', mockLogger);
 
-      await expect(api.getThingShadow('SERIAL123')).rejects.toThrow();
+      // getThingShadow catches errors and returns undefined when not connected
+      const result = await api.getThingShadow('SERIAL123');
+      expect(result).toBeUndefined();
     });
   });
 });

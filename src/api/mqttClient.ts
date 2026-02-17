@@ -283,6 +283,15 @@ export class MQTTClient extends EventEmitter {
   }
 
   /**
+   * Remove specific listeners for a shadow operation
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private cleanupShadowListeners(onUpdate: (...args: any[]) => void, onRejected: (...args: any[]) => void): void {
+    this.removeListener('shadowUpdate', onUpdate);
+    this.removeListener('shadowRejected', onRejected);
+  }
+
+  /**
    * Request current shadow state
    */
   async getShadow(): Promise<RawShadowState> {
@@ -290,40 +299,39 @@ export class MQTTClient extends EventEmitter {
 
     return new Promise((resolve, reject) => {
       let settled = false;
+      // eslint-disable-next-line prefer-const -- forward-declared for mutual reference with timeout
+      let onUpdate: (shadow: RawShadowState) => void;
+      // eslint-disable-next-line prefer-const -- forward-declared for mutual reference with timeout
+      let onRejected: (error: unknown) => void;
 
-      const cleanup = () => {
-        this.removeListener('shadowUpdate', onUpdate);
-        this.removeListener('shadowRejected', onRejected);
-      };
+      const timeout = setTimeout(() => {
+        if (!settled) {
+          settled = true;
+          this.cleanupShadowListeners(onUpdate, onRejected);
+          reject(new MQTTError(ErrorCode.MQTT_SHADOW_TIMEOUT, 'Shadow request timeout'));
+        }
+      }, SHADOW_TIMEOUT_MS);
 
-      const onUpdate = (shadow: RawShadowState) => {
+      onUpdate = (shadow: RawShadowState) => {
         if (!settled) {
           settled = true;
           clearTimeout(timeout);
-          cleanup();
+          this.cleanupShadowListeners(onUpdate, onRejected);
           resolve(shadow);
         }
       };
 
-      const onRejected = (error: unknown) => {
+      onRejected = (error: unknown) => {
         if (!settled) {
           settled = true;
           clearTimeout(timeout);
-          cleanup();
+          this.cleanupShadowListeners(onUpdate, onRejected);
           reject(new MQTTError(
             ErrorCode.MQTT_SHADOW_REJECTED,
             `Shadow request rejected: ${JSON.stringify(error)}`,
           ));
         }
       };
-
-      const timeout = setTimeout(() => {
-        if (!settled) {
-          settled = true;
-          cleanup();
-          reject(new MQTTError(ErrorCode.MQTT_SHADOW_TIMEOUT, 'Shadow request timeout'));
-        }
-      }, SHADOW_TIMEOUT_MS);
 
       this.once('shadowUpdate', onUpdate);
       this.once('shadowRejected', onRejected);
@@ -342,39 +350,38 @@ export class MQTTClient extends EventEmitter {
 
     return new Promise<boolean>((resolve) => {
       let settled = false;
-
-      const cleanup = () => {
-        this.removeListener('shadowUpdate', onUpdate);
-        this.removeListener('shadowRejected', onRejected);
-      };
-
-      const onUpdate = () => {
-        if (!settled) {
-          settled = true;
-          clearTimeout(timeout);
-          cleanup();
-          resolve(true);
-        }
-      };
-
-      const onRejected = (error: unknown) => {
-        if (!settled) {
-          settled = true;
-          clearTimeout(timeout);
-          cleanup();
-          this.log.error('Shadow update rejected:', error);
-          resolve(false);
-        }
-      };
+      // eslint-disable-next-line prefer-const -- forward-declared for mutual reference with timeout
+      let onUpdate: () => void;
+      // eslint-disable-next-line prefer-const -- forward-declared for mutual reference with timeout
+      let onRejected: (error: unknown) => void;
 
       const timeout = setTimeout(() => {
         if (!settled) {
           settled = true;
-          cleanup();
+          this.cleanupShadowListeners(onUpdate, onRejected);
           this.log.error('Shadow update timeout');
           resolve(false);
         }
       }, SHADOW_TIMEOUT_MS);
+
+      onUpdate = () => {
+        if (!settled) {
+          settled = true;
+          clearTimeout(timeout);
+          this.cleanupShadowListeners(onUpdate, onRejected);
+          resolve(true);
+        }
+      };
+
+      onRejected = (error: unknown) => {
+        if (!settled) {
+          settled = true;
+          clearTimeout(timeout);
+          this.cleanupShadowListeners(onUpdate, onRejected);
+          this.log.error('Shadow update rejected:', error);
+          resolve(false);
+        }
+      };
 
       this.once('shadowUpdate', onUpdate);
       this.once('shadowRejected', onRejected);

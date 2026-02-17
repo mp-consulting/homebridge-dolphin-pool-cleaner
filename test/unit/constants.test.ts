@@ -118,9 +118,9 @@ describe('Constants', () => {
   });
 
   describe('CLEANING_MODES', () => {
-    it('should have regular mode', () => {
-      expect(CLEANING_MODES.regular).toBeDefined();
-      expect(CLEANING_MODES.regular.name).toBe('All Surfaces');
+    it('should have all mode', () => {
+      expect(CLEANING_MODES.all).toBeDefined();
+      expect(CLEANING_MODES.all.name).toBe('All Surfaces');
     });
 
     it('should have short mode', () => {
@@ -150,10 +150,10 @@ describe('Constants', () => {
       });
     });
 
-    it('all modes should have value', () => {
+    it('all modes should have apiMode', () => {
       Object.values(CLEANING_MODES).forEach((mode) => {
-        expect(mode.value).toBeDefined();
-        expect(typeof mode.value).toBe('number');
+        expect(mode.apiMode).toBeDefined();
+        expect(typeof mode.apiMode).toBe('string');
       });
     });
   });

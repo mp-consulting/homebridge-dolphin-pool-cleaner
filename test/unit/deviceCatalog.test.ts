@@ -43,10 +43,12 @@ describe('Device Catalog', () => {
       expect(features.supportedCleaningModes).toContain('regular');
     });
 
-    it('should have temperature sensor for M-series', () => {
+    it('should have temperature sensor disabled by default for M-series', () => {
       const features = getDeviceFeatures(62);
 
-      expect(features.hasTemperatureSensor).toBe(true);
+      // Temperature sensor is disabled by default for M-series;
+      // not all M400/M600 models support it. Users enable via config.
+      expect(features.hasTemperatureSensor).toBe(false);
     });
 
     it('should have LED control for M-series', () => {
