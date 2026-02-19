@@ -15,6 +15,7 @@ const COGNITO_CLIENT_ID = '4ed12eq01o6n0tl5f0sqmkq2na';
 const MAYTRONICS_BASE_URL = 'https://apps.maytronics.com';
 const APP_KEY = '346BDE92-53D1-4829-8A2E-B496014B586C';
 const REQUEST_TIMEOUT = 30000;
+const SESSION_TTL_MS = 5 * 60 * 1000; // 5 minutes - Cognito sessions expire quickly
 
 /**
  * Challenge type messages
@@ -44,6 +45,10 @@ class HttpClient {
       signal: AbortSignal.timeout(REQUEST_TIMEOUT),
     });
 
+    if (!response.ok && response.status >= 500) {
+      throw new Error(`Cognito service error: HTTP ${response.status}`);
+    }
+
     return response.json();
   }
 
@@ -66,6 +71,11 @@ class HttpClient {
     }
 
     const response = await fetch(`${MAYTRONICS_BASE_URL}${endpoint}`, options);
+
+    if (!response.ok && response.status >= 500) {
+      throw new Error(`Maytronics API error: HTTP ${response.status}`);
+    }
+
     return response.json();
   }
 }
@@ -288,6 +298,7 @@ class DolphinUiServer extends HomebridgePluginUiServer {
         this.pendingSessions.set(email, {
           session: cognitoResult.session,
           challengeName: cognitoResult.challengeName,
+          createdAt: Date.now(),
         });
         return cognitoResult;
       }
@@ -314,9 +325,17 @@ class DolphinUiServer extends HomebridgePluginUiServer {
       return { success: false, error: 'Email and OTP code are required' };
     }
 
+    // Clean up expired sessions
+    this.cleanExpiredSessions();
+
     const session = this.pendingSessions.get(email);
     if (!session) {
       return { success: false, error: 'No pending authentication. Please try again.' };
+    }
+
+    if (Date.now() - session.createdAt > SESSION_TTL_MS) {
+      this.pendingSessions.delete(email);
+      return { success: false, error: 'Session expired. Please try again.' };
     }
 
     try {
@@ -403,6 +422,18 @@ class DolphinUiServer extends HomebridgePluginUiServer {
         deviceType: authResult.deviceType,
       }],
     };
+  }
+
+  /**
+   * Remove expired sessions from the pending sessions map
+   */
+  cleanExpiredSessions() {
+    const now = Date.now();
+    for (const [email, session] of this.pendingSessions) {
+      if (now - session.createdAt > SESSION_TTL_MS) {
+        this.pendingSessions.delete(email);
+      }
+    }
   }
 
   /**

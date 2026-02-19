@@ -18,7 +18,6 @@ import type {
   ParsedRobotState,
   RawShadowReported,
   RawShadowState,
-  StateUpdateResult,
 } from './types.js';
 
 /**
@@ -392,42 +391,6 @@ export function parseShadowState(
   const legacyState = parseLegacyFormat(reported);
 
   return mergeState(merged, legacyState);
-}
-
-/**
- * Parse shadow state with change detection
- *
- * @param shadow - Raw shadow state from AWS IoT
- * @param existingState - Existing state to compare with
- * @param lastVersion - Last processed shadow version
- * @returns State update result with change detection
- */
-export function parseShadowStateWithChanges(
-  shadow: RawShadowState | unknown,
-  existingState: ParsedRobotState,
-  lastVersion?: number,
-): StateUpdateResult {
-  // Type guard for shadow
-  if (!shadow || typeof shadow !== 'object') {
-    return { state: {}, hasChanges: false };
-  }
-
-  const typedShadow = shadow as RawShadowState;
-
-  // Check if shadow has been updated
-  if (typedShadow.version !== undefined && typedShadow.version === lastVersion) {
-    return { state: {}, hasChanges: false };
-  }
-
-  const newState = parseShadowState(shadow, existingState);
-
-  // Detect changes
-  const hasChanges = JSON.stringify(existingState) !== JSON.stringify(newState);
-
-  return {
-    state: newState,
-    hasChanges,
-  };
 }
 
 /**

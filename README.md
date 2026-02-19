@@ -177,6 +177,13 @@ The filter indicator is based on the `filterBagIndication.state` value (0-100%).
 
 Water temperature is only available when the robot is actively in the water and its sensors are submerged.
 
+## Security
+
+- All user-facing HTML output is sanitized to prevent XSS
+- Image URLs are validated to allow only `http`/`https` protocols
+- AWS credentials and tokens are never written to logs, even at debug level
+- OTP sessions expire automatically after 5 minutes
+
 ## Debug Logging
 
 Enable debug logging in Homebridge to see detailed plugin activity:
@@ -189,6 +196,8 @@ Or add to your Homebridge startup arguments:
 ```
 -D
 ```
+
+> **Note**: Debug logs are safe to share publicly. Sensitive credentials (AWS keys, tokens) are automatically redacted.
 
 ## Development
 

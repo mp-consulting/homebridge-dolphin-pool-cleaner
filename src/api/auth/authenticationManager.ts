@@ -20,9 +20,8 @@ import {
   IOT_ENDPOINTS,
   DEFAULT_IOT_REGION,
   API_TIMEOUT_MS,
-  DEBUG_LOG_PREVIEW_LENGTH,
 } from '../../config/constants.js';
-import { AuthError, ErrorCode } from '../../utils/errors.js';
+import { AuthError, ErrorCode, getErrorMessage } from '../../utils/errors.js';
 import { CredentialManager } from './credentialManager.js';
 import type { AuthConfig, AWSIoTCredentials, LoginResult } from './types.js';
 
@@ -94,7 +93,7 @@ export class AuthenticationManager {
     } catch (error) {
       this.log.error(
         'Login failed:',
-        error instanceof Error ? error.message : String(error),
+        getErrorMessage(error),
       );
       throw error;
     }
@@ -262,8 +261,8 @@ export class AuthenticationManager {
       });
 
       this.log.debug(
-        'AWS credentials response:',
-        JSON.stringify(response.data).substring(0, DEBUG_LOG_PREVIEW_LENGTH),
+        'AWS credentials response received, status:',
+        response.data.Status,
       );
 
       if (response.data.Status !== '1') {

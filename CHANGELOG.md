@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.9] - 2026-02-17
+
+### Security
+
+- **Fixed XSS vulnerability in setup wizard** - User-controlled values (robot name, serial number, email, image URL) were injected into `innerHTML` without sanitization. Added HTML escaping and URL protocol validation to prevent script injection via malicious API responses.
+- **Removed sensitive credential logging** - AWS `AccessKeyId`, `SecretAccessKey`, and `SessionToken` were being logged at debug level via `JSON.stringify()`. Also removed logging of the SigV4 canonical request which contained the access key.
+
+### Fixed
+
+- **Fixed event listener leak in MQTT client** - `getShadow()` and `updateShadow()` used `removeAllListeners()` which stripped external listeners registered by other components. Replaced with targeted `removeListener()` to only clean up operation-specific handlers.
+- **Fixed BLE command data length encoding** - Data length field was encoded in big-endian but the protocol specifies little-endian (matching the checksum encoding). Commands with data payloads > 255 bytes would be malformed.
+- **Fixed missing HTTP response status checks in UI server** - `fetch()` responses from Cognito and Maytronics APIs were parsed as JSON without checking for HTTP 5xx errors, producing silent garbage results on server failures.
+- **Fixed session memory leak in UI server** - Pending OTP sessions were stored without TTL. Abandoned authentication flows accumulated indefinitely. Added 5-minute expiry with automatic cleanup.
+- **Added overflow protection for BLE command builder** - Data payloads exceeding 65,535 bytes (the 2-byte field maximum) now return `undefined` instead of producing malformed packets.
+- Fixed stale unit tests that didn't match current implementation (cleaning modes API, M-Series temperature sensor default, shadow fetch error handling)
+
 ## [1.0.8] - 2026-01-19
 
 ### Changed
@@ -165,6 +181,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Uses AWS SDK v3 for Cognito and IoT
 - MQTT 5.x for real-time communication
 
+[1.0.9]: https://github.com/mp-consulting/homebridge-dolphin-pool-cleaner/releases/tag/v1.0.9
+[1.0.8]: https://github.com/mp-consulting/homebridge-dolphin-pool-cleaner/releases/tag/v1.0.8
 [1.0.7]: https://github.com/mp-consulting/homebridge-dolphin-pool-cleaner/releases/tag/v1.0.7
 [1.0.6]: https://github.com/mp-consulting/homebridge-dolphin-pool-cleaner/releases/tag/v1.0.6
 [1.0.5]: https://github.com/mp-consulting/homebridge-dolphin-pool-cleaner/releases/tag/v1.0.5

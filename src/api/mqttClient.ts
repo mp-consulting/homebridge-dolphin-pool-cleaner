@@ -179,7 +179,7 @@ export class MQTTClient extends EventEmitter {
       payloadHash,
     ].join('\n');
 
-    this.log.debug('Canonical request:', canonicalRequest);
+    this.log.debug('Canonical request constructed for SigV4 signing');
 
     const hashedCanonicalRequest = createHash('sha256').update(canonicalRequest).digest('hex');
     const stringToSign = [algorithm, amzDate, credentialScope, hashedCanonicalRequest].join('\n');
@@ -283,48 +283,70 @@ export class MQTTClient extends EventEmitter {
   }
 
   /**
+   * Wait for a shadow response (update accepted or rejected) with timeout.
+   * Shared logic for getShadow and updateShadow.
+   */
+  private waitForShadowResponse<T>(
+    onSuccess: (resolve: (value: T) => void) => (...args: unknown[]) => void,
+    onFailure: (resolve: (value: T) => void, reject: (reason: unknown) => void) => (...args: unknown[]) => void,
+    publish: () => void,
+  ): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      let settled = false;
+      // eslint-disable-next-line prefer-const -- forward-declared for mutual reference with timeout
+      let updateHandler: (...args: unknown[]) => void;
+      // eslint-disable-next-line prefer-const -- forward-declared for mutual reference with timeout
+      let rejectedHandler: (...args: unknown[]) => void;
+      // eslint-disable-next-line prefer-const -- forward-declared for mutual reference with handlers
+      let timeout: ReturnType<typeof setTimeout>;
+
+      const settle = <V>(cb: (value: V) => void, value: V) => {
+        if (!settled) {
+          settled = true;
+          clearTimeout(timeout);
+          this.removeListener('shadowUpdate', updateHandler);
+          this.removeListener('shadowRejected', rejectedHandler);
+          cb(value);
+        }
+      };
+
+      timeout = setTimeout(() => {
+        settle(reject, new MQTTError(ErrorCode.MQTT_SHADOW_TIMEOUT, 'Shadow operation timeout'));
+      }, SHADOW_TIMEOUT_MS);
+
+      updateHandler = onSuccess((value: T) => settle(resolve, value));
+      rejectedHandler = onFailure(
+        (value: T) => settle(resolve, value),
+        (reason: unknown) => settle(reject, reason),
+      );
+
+      this.once('shadowUpdate', updateHandler);
+      this.once('shadowRejected', rejectedHandler);
+
+      publish();
+    });
+  }
+
+  /**
    * Request current shadow state
    */
   async getShadow(): Promise<RawShadowState> {
     this.ensureConnected();
 
-    return new Promise((resolve, reject) => {
-      let settled = false;
-
-      const timeout = setTimeout(() => {
-        if (!settled) {
-          settled = true;
-          this.removeAllListeners('shadowUpdate');
-          this.removeAllListeners('shadowRejected');
-          reject(new MQTTError(ErrorCode.MQTT_SHADOW_TIMEOUT, 'Shadow request timeout'));
-        }
-      }, SHADOW_TIMEOUT_MS);
-
-      this.once('shadowUpdate', (shadow: RawShadowState) => {
-        if (!settled) {
-          settled = true;
-          clearTimeout(timeout);
-          this.removeAllListeners('shadowRejected');
-          resolve(shadow);
-        }
-      });
-
-      this.once('shadowRejected', (error: unknown) => {
-        if (!settled) {
-          settled = true;
-          clearTimeout(timeout);
-          this.removeAllListeners('shadowUpdate');
-          reject(new MQTTError(
-            ErrorCode.MQTT_SHADOW_REJECTED,
-            `Shadow request rejected: ${JSON.stringify(error)}`,
-          ));
-        }
-      });
-
-      const topic = `$aws/things/${this.truncatedSerial}/shadow/get`;
-      this.client!.publish(topic, '', { qos: 1 });
-      this.log.debug(`Requested shadow on ${topic}`);
-    });
+    return this.waitForShadowResponse<RawShadowState>(
+      (resolve) => (shadow: unknown) => resolve(shadow as RawShadowState),
+      (_resolve, reject) => (error: unknown) => {
+        reject(new MQTTError(
+          ErrorCode.MQTT_SHADOW_REJECTED,
+          `Shadow request rejected: ${JSON.stringify(error)}`,
+        ));
+      },
+      () => {
+        const topic = `$aws/things/${this.truncatedSerial}/shadow/get`;
+        this.client!.publish(topic, '', { qos: 1 });
+        this.log.debug(`Requested shadow on ${topic}`);
+      },
+    );
   }
 
   /**
@@ -333,43 +355,19 @@ export class MQTTClient extends EventEmitter {
   async updateShadow(desired: Record<string, unknown>): Promise<boolean> {
     this.ensureConnected();
 
-    return new Promise<boolean>((resolve) => {
-      let settled = false;
-
-      const timeout = setTimeout(() => {
-        if (!settled) {
-          settled = true;
-          this.removeAllListeners('shadowUpdate');
-          this.removeAllListeners('shadowRejected');
-          this.log.error('Shadow update timeout');
-          resolve(false);
-        }
-      }, SHADOW_TIMEOUT_MS);
-
-      this.once('shadowUpdate', () => {
-        if (!settled) {
-          settled = true;
-          clearTimeout(timeout);
-          this.removeAllListeners('shadowRejected');
-          resolve(true);
-        }
-      });
-
-      this.once('shadowRejected', (error: unknown) => {
-        if (!settled) {
-          settled = true;
-          clearTimeout(timeout);
-          this.removeAllListeners('shadowUpdate');
-          this.log.error('Shadow update rejected:', error);
-          resolve(false);
-        }
-      });
-
-      const payload = JSON.stringify({ state: { desired } });
-      const topic = `$aws/things/${this.truncatedSerial}/shadow/update`;
-      this.client!.publish(topic, payload, { qos: 1 });
-      this.log.debug(`Published shadow update on ${topic}:`, payload.substring(0, DEBUG_LOG_PREVIEW_LENGTH));
-    });
+    return this.waitForShadowResponse<boolean>(
+      (resolve) => () => resolve(true),
+      (resolve) => (error: unknown) => {
+        this.log.error('Shadow update rejected:', error);
+        resolve(false);
+      },
+      () => {
+        const payload = JSON.stringify({ state: { desired } });
+        const topic = `$aws/things/${this.truncatedSerial}/shadow/update`;
+        this.client!.publish(topic, payload, { qos: 1 });
+        this.log.debug(`Published shadow update on ${topic}:`, payload.substring(0, DEBUG_LOG_PREVIEW_LENGTH));
+      },
+    );
   }
 
   /**

@@ -130,4 +130,3 @@ export function getDeviceModelName(deviceType: number): string {
 export function getSupportedDeviceTypes(): number[] {
   return Object.keys(DEVICE_CATALOG).map((k) => parseInt(k, 10));
 }
-//# sourceMappingURL=deviceCatalog.js.map
