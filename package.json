@@ -47,8 +47,8 @@
     "url": "https://github.com/mp-consulting/homebridge-dolphin-pool-cleaner/issues"
   },
   "funding": {
-    "type": "github",
-    "url": "https://github.com/sponsors/mp-consulting"
+    "type": "paypal",
+    "url": "https://paypal.me/mickaelpalma"
   },
   "homepage": "https://github.com/mp-consulting/homebridge-dolphin-pool-cleaner#readme",
   "dependencies": {
