@@ -76,5 +76,10 @@
     "pluginType": "platform",
     "singular": true,
     "customUi": true
-  }
+  },
+  "files": [
+    "dist",
+    "homebridge-ui",
+    "config.schema.json"
+  ]
 }
