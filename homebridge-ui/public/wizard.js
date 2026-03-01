@@ -135,34 +135,90 @@
         success: document.getElementById('step-success'),
       };
     },
-    get loginForm() { return document.getElementById('login-form'); },
-    get loginBtn() { return document.getElementById('login-btn'); },
-    get loginError() { return document.getElementById('login-error'); },
-    get otpForm() { return document.getElementById('otp-form'); },
-    get otpBtn() { return document.getElementById('otp-btn'); },
-    get otpError() { return document.getElementById('otp-error'); },
-    get otpMessage() { return document.getElementById('otp-message'); },
-    get otpBackBtn() { return document.getElementById('otp-back-btn'); },
-    get backBtn() { return document.getElementById('back-btn'); },
-    get saveBtn() { return document.getElementById('save-btn'); },
-    get doneBtn() { return document.getElementById('done-btn'); },
-    get addRobotBtn() { return document.getElementById('add-robot-btn'); },
-    get reconfigureBtn() { return document.getElementById('reconfigure-btn'); },
-    get configuredRobotsList() { return document.getElementById('configured-robots-list'); },
-    get email() { return document.getElementById('email'); },
-    get otpCode() { return document.getElementById('otp-code'); },
-    get displayName() { return document.getElementById('display-name'); },
-    get cleaningMode() { return document.getElementById('cleaning-mode'); },
-    get pollingInterval() { return document.getElementById('polling-interval'); },
-    get enableTemperature() { return document.getElementById('enable-temperature'); },
-    get enableFilter() { return document.getElementById('enable-filter'); },
-    get robotSerial() { return document.getElementById('robot-serial'); },
-    get robotModel() { return document.getElementById('robot-model'); },
-    get robotDeviceType() { return document.getElementById('robot-device-type'); },
-    get robotImage() { return document.getElementById('robot-image'); },
-    get robotSvgContainer() { return document.getElementById('robot-svg-container'); },
-    get modeDescription() { return document.getElementById('mode-description'); },
-    get modeDurationText() { return document.getElementById('mode-duration-text'); },
+    get loginForm() {
+      return document.getElementById('login-form'); 
+    },
+    get loginBtn() {
+      return document.getElementById('login-btn'); 
+    },
+    get loginError() {
+      return document.getElementById('login-error'); 
+    },
+    get otpForm() {
+      return document.getElementById('otp-form'); 
+    },
+    get otpBtn() {
+      return document.getElementById('otp-btn'); 
+    },
+    get otpError() {
+      return document.getElementById('otp-error'); 
+    },
+    get otpMessage() {
+      return document.getElementById('otp-message'); 
+    },
+    get otpBackBtn() {
+      return document.getElementById('otp-back-btn'); 
+    },
+    get backBtn() {
+      return document.getElementById('back-btn'); 
+    },
+    get saveBtn() {
+      return document.getElementById('save-btn'); 
+    },
+    get doneBtn() {
+      return document.getElementById('done-btn'); 
+    },
+    get addRobotBtn() {
+      return document.getElementById('add-robot-btn'); 
+    },
+    get reconfigureBtn() {
+      return document.getElementById('reconfigure-btn'); 
+    },
+    get configuredRobotsList() {
+      return document.getElementById('configured-robots-list'); 
+    },
+    get email() {
+      return document.getElementById('email'); 
+    },
+    get otpCode() {
+      return document.getElementById('otp-code'); 
+    },
+    get displayName() {
+      return document.getElementById('display-name'); 
+    },
+    get cleaningMode() {
+      return document.getElementById('cleaning-mode'); 
+    },
+    get pollingInterval() {
+      return document.getElementById('polling-interval'); 
+    },
+    get enableTemperature() {
+      return document.getElementById('enable-temperature'); 
+    },
+    get enableFilter() {
+      return document.getElementById('enable-filter'); 
+    },
+    get robotSerial() {
+      return document.getElementById('robot-serial'); 
+    },
+    get robotModel() {
+      return document.getElementById('robot-model'); 
+    },
+    get robotDeviceType() {
+      return document.getElementById('robot-device-type'); 
+    },
+    get robotImage() {
+      return document.getElementById('robot-image'); 
+    },
+    get robotSvgContainer() {
+      return document.getElementById('robot-svg-container'); 
+    },
+    get modeDescription() {
+      return document.getElementById('mode-description'); 
+    },
+    get modeDurationText() {
+      return document.getElementById('mode-duration-text'); 
+    },
   };
 
   // ============================================================================

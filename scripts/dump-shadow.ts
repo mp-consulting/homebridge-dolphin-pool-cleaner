@@ -216,10 +216,10 @@ function analyzeCleaningState(reported: any): void {
 
       if (elapsedMinutes >= 0 && elapsedMinutes < cycleTime) {
         const remaining = cycleTime - elapsedMinutes;
-        console.log(`\n✅ ROBOT IS CLEANING`);
+        console.log('\n✅ ROBOT IS CLEANING');
         console.log(`   Time Remaining: ${remaining.toFixed(0)} minutes`);
       } else {
-        console.log(`\n⏹️ ROBOT IS NOT CLEANING (cycle finished or not started)`);
+        console.log('\n⏹️ ROBOT IS NOT CLEANING (cycle finished or not started)');
       }
     } else {
       console.log('\nNo cycleStartTime found - robot has not cleaned recently');
@@ -228,14 +228,14 @@ function analyzeCleaningState(reported: any): void {
 
   // Check robotState if present
   if (reported.robotState) {
-    console.log(`\nRobot State:`);
+    console.log('\nRobot State:');
     console.log(`  isOn: ${reported.robotState.isOn}`);
     console.log(`  pwsState: ${reported.robotState.pwsState}`);
   }
 
   // Check system state
   if (reported.systemState) {
-    console.log(`\nSystem State:`);
+    console.log('\nSystem State:');
     console.log(`  pwsState: ${reported.systemState.pwsState} (power supply)`);
   }
 }

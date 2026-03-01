@@ -4,9 +4,9 @@ import tseslint from 'typescript-eslint';
 export default tseslint.config(
   // Ignores
   {
-    ignores: ['dist/**', 'node_modules/**', 'homebridge-ui/**', 'test/**', 'scripts/**', 'tmp/**'],
+    ignores: ['dist/**', 'node_modules/**'],
   },
-  // Base recommended configs (must come before custom rules)
+  // Base recommended configs
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
   // Language options
@@ -16,10 +16,10 @@ export default tseslint.config(
       sourceType: 'module',
     },
   },
-  // Custom rules (override recommended)
+  // Core rules
   {
     rules: {
-      // Style rules
+      // Style
       'quotes': ['error', 'single', { avoidEscape: true }],
       'indent': ['error', 2, { SwitchCase: 1 }],
       'linebreak-style': ['error', 'unix'],
@@ -37,13 +37,77 @@ export default tseslint.config(
       'prefer-const': 'error',
       'no-var': 'error',
 
-      // TypeScript rules
+      // TypeScript
       'no-use-before-define': 'off',
-      '@typescript-eslint/no-use-before-define': ['error', { classes: false, enums: false }],
+      '@typescript-eslint/no-use-before-define': ['error', { classes: false, enums: false, functions: false }],
       '@typescript-eslint/no-unused-vars': ['error', { caughtErrors: 'none', argsIgnorePattern: '^_' }],
       '@typescript-eslint/explicit-function-return-type': 'off',
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/consistent-type-imports': ['error', { prefer: 'type-imports' }],
+    },
+  },
+  // Test files — relaxed rules
+  {
+    files: ['src/**/*.{test,spec}.ts', 'test/**/*.{test,spec}.ts', 'tests/**/*.{test,spec}.ts', 'src/__tests__/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-use-before-define': 'off',
+      '@typescript-eslint/no-explicit-any': 'off',
+    },
+  },
+  // homebridge-ui browser globals
+  {
+    files: ['homebridge-ui/public/**/*.js'],
+    languageOptions: {
+      globals: {
+        document: 'readonly',
+        window: 'readonly',
+        homebridge: 'readonly',
+        bootstrap: 'readonly',
+        console: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
+        setInterval: 'readonly',
+        clearInterval: 'readonly',
+        URL: 'readonly',
+      },
+    },
+    rules: {
+      '@typescript-eslint/no-use-before-define': 'off',
+    },
+  },
+  // homebridge-ui server globals
+  {
+    files: ['homebridge-ui/server.js'],
+    languageOptions: {
+      globals: {
+        console: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
+        setInterval: 'readonly',
+        clearInterval: 'readonly',
+        process: 'readonly',
+        fetch: 'readonly',
+        AbortSignal: 'readonly',
+      },
+    },
+  },
+  // scripts — Node.js globals and relaxed rules
+  {
+    files: ['scripts/**/*.{js,mjs,ts}'],
+    languageOptions: {
+      globals: {
+        console: 'readonly',
+        process: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
+        setInterval: 'readonly',
+        clearInterval: 'readonly',
+        Buffer: 'readonly',
+        URL: 'readonly',
+      },
+    },
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
     },
   },
 );

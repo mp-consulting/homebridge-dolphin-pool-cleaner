@@ -9,7 +9,6 @@ import {
   createMockAxios,
   mockMaytronicsResponses,
   mockCognitoAuthResult,
-  mockShadowState,
   createMockMqttClient,
 } from '../mocks/index.js';
 
@@ -245,7 +244,7 @@ describe('Platform - Error Handling', () => {
   });
 
   it('should handle missing config', () => {
-    const platform = new DolphinPoolCleanerPlatform(mockLogger, {}, mockApi);
+    new DolphinPoolCleanerPlatform(mockLogger, {}, mockApi);
 
     expect(mockLogger.error).toHaveBeenCalled();
   });

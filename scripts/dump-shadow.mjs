@@ -232,7 +232,7 @@ function analyzeCleaningState(reported) {
       const elapsedMinutes = (now - startTime) / 60;
       const startDate = new Date(startTime * 1000);
 
-      console.log(`\n⏱️  Cycle Information:`);
+      console.log('\n⏱️  Cycle Information:');
       console.log(`   Started: ${startDate.toLocaleString()}`);
       console.log(`   Mode: ${mode}`);
       console.log(`   Duration: ${cycleTime} minutes`);
@@ -240,7 +240,7 @@ function analyzeCleaningState(reported) {
 
       if (elapsedMinutes >= 0 && elapsedMinutes < cycleTime) {
         const remaining = cycleTime - elapsedMinutes;
-        console.log(`\n   ✅ ROBOT IS CLEANING`);
+        console.log('\n   ✅ ROBOT IS CLEANING');
         console.log(`   ⏳ Time Remaining: ${remaining.toFixed(0)} minutes`);
       } else {
         console.log(`\n   ⏹️  ROBOT IS IDLE (cycle completed ${(elapsedMinutes - cycleTime).toFixed(0)} min ago)`);
@@ -252,7 +252,7 @@ function analyzeCleaningState(reported) {
 
   // Check system state
   if (reported.systemState) {
-    console.log(`\n🔌 System State:`);
+    console.log('\n🔌 System State:');
     console.log(`   PWS State: ${reported.systemState.pwsState}`);
     console.log(`   Robot State: ${reported.systemState.robotState || 'unknown'}`);
     console.log(`   Robot Type: ${reported.systemState.robotType || 'unknown'}`);
@@ -262,13 +262,13 @@ function analyzeCleaningState(reported) {
 
   // Check connection
   if (reported.isConnected) {
-    console.log(`\n📡 Connection:`);
+    console.log('\n📡 Connection:');
     console.log(`   Connected: ${reported.isConnected.connected ? 'Yes ✓' : 'No ✗'}`);
   }
 
   // Check WiFi - actual structure has netName in wifi, RSSI in debug
   if (reported.wifi || reported.debug) {
-    console.log(`\n📶 WiFi:`);
+    console.log('\n📶 WiFi:');
     const netName = reported.wifi?.netName || reported.wifi?.ssid || 'Unknown';
     const rssi = reported.debug?.WIFI_RSSI || reported.wifi?.rssi;
     console.log(`   Network: ${netName}`);
@@ -281,7 +281,7 @@ function analyzeCleaningState(reported) {
   // Check filter - actual structure has numeric 'state' (0-100%)
   const filterData = reported.filterBagIndication || reported.filterIndicator;
   if (filterData) {
-    console.log(`\n🧹 Filter Status:`);
+    console.log('\n🧹 Filter Status:');
     if (filterData.state !== undefined) {
       // Numeric state: 0-100 where higher means filter is fuller
       const percent = filterData.state;
@@ -302,7 +302,7 @@ function analyzeCleaningState(reported) {
   if (reported.robotError) {
     const code = reported.robotError.errorCode;
     if (code > 0 && code < 255) {
-      console.log(`\n⚠️  Robot Error:`);
+      console.log('\n⚠️  Robot Error:');
       console.log(`   Code: ${code}`);
       console.log(`   PCB Hours: ${reported.robotError.pcbHours}`);
       console.log(`   Turn On Count: ${reported.robotError.turnOnCount}`);
@@ -314,16 +314,16 @@ function analyzeCleaningState(reported) {
     const code = reported.pwsError.errorCode;
     // 255 and 65535 mean "no error" for PWS
     if (code > 0 && code < 255) {
-      console.log(`\n⚠️  PWS Error:`);
+      console.log('\n⚠️  PWS Error:');
       console.log(`   Code: ${code}`);
     } else {
-      console.log(`✅ PWS Error: None`);
+      console.log('✅ PWS Error: None');
     }
   }
 
   // Check features - actual structure has different field names
   if (reported.featureEn) {
-    console.log(`\n🎛️  Available Features:`);
+    console.log('\n🎛️  Available Features:');
     console.log(`   Delay Start: ${reported.featureEn.delay ? 'Yes' : 'No'}`);
     console.log(`   Floor Mode: ${reported.featureEn.floor ? 'Yes' : 'No'}`);
     console.log(`   Short Mode: ${reported.featureEn.short ? 'Yes' : 'No'}`);
@@ -336,7 +336,7 @@ function analyzeCleaningState(reported) {
 
   // Check available modes - actual structure is { modeName: cycleTimeInMinutes }
   if (reported.cleaningModes) {
-    console.log(`\n🧼 Available Cleaning Modes:`);
+    console.log('\n🧼 Available Cleaning Modes:');
     for (const [modeName, cycleTime] of Object.entries(reported.cleaningModes)) {
       if (typeof cycleTime === 'number') {
         console.log(`   ${modeName}: ${cycleTime} min`);
@@ -348,7 +348,7 @@ function analyzeCleaningState(reported) {
 
   // Check versions
   if (reported.versions) {
-    console.log(`\n📦 Firmware Versions:`);
+    console.log('\n📦 Firmware Versions:');
     if (reported.versions.sysVersion) {
       console.log(`   System: ${reported.versions.sysVersion}`);
     }
@@ -364,20 +364,20 @@ function analyzeCleaningState(reported) {
 
   // Check weekly settings
   if (reported.weeklySettings) {
-    console.log(`\n📅 Weekly Schedule:`);
+    console.log('\n📅 Weekly Schedule:');
     console.log(`   Repeat Mode: ${reported.weeklySettings.isInRepeatMode ? 'Yes' : 'No'}`);
     const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
     const enabledDays = days.filter(d => reported.weeklySettings[d]?.isEnabled);
     if (enabledDays.length > 0) {
       console.log(`   Enabled Days: ${enabledDays.join(', ')}`);
     } else {
-      console.log(`   Enabled Days: None`);
+      console.log('   Enabled Days: None');
     }
   }
 
   // Check delay settings
   if (reported.delay) {
-    console.log(`\n⏰ Delay Settings:`);
+    console.log('\n⏰ Delay Settings:');
     console.log(`   Enabled: ${reported.delay.isEnabled ? 'Yes' : 'No'}`);
     if (reported.delay.startTime) {
       console.log(`   Start Time: ${reported.delay.startTime.hours}:${String(reported.delay.startTime.minutes).padStart(2, '0')}`);
