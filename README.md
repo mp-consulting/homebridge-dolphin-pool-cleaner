@@ -1,7 +1,6 @@
 # Homebridge Dolphin Pool Cleaner
 
 [![npm version](https://badge.fury.io/js/%40mp-consulting%2Fhomebridge-dolphin-pool-cleaner.svg)](https://www.npmjs.com/package/@mp-consulting/homebridge-dolphin-pool-cleaner)
-[![verified-by-homebridge](https://badgen.net/badge/homebridge/verified/purple)](https://github.com/homebridge/homebridge/wiki/Verified-Plugins)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 Control your Maytronics Dolphin pool cleaning robot through Apple HomeKit using Homebridge.
