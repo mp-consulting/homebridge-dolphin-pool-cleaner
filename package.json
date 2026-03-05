@@ -8,7 +8,7 @@
   "scripts": {
     "lint": "eslint . --max-warnings=0",
     "watch": "npm run build && npm link && nodemon",
-    "copy:ui-kit": "mkdir -p homebridge-ui/public/lib && cp node_modules/@mp-consulting/homebridge-ui-kit/dist/kit.css homebridge-ui/public/lib/ && cp node_modules/@mp-consulting/homebridge-ui-kit/dist/kit.js homebridge-ui/public/lib/",
+    "copy:ui-kit": "cp node_modules/@mp-consulting/homebridge-ui-kit/dist/kit.css homebridge-ui/public/ && cp node_modules/@mp-consulting/homebridge-ui-kit/dist/kit.js homebridge-ui/public/",
     "copy-assets": "mkdir -p ./dist/protocol && cp ./src/protocol/*.json ./dist/protocol/",
     "build": "npm run copy:ui-kit && rimraf ./dist && tsc && npm run copy-assets",
     "prepublishOnly": "npm run lint && npm run build",

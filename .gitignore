@@ -47,4 +47,5 @@ _bmad/
 _bmad-output/
 
 # Generated UI kit assets (copied from node_modules by copy:ui-kit script)
-homebridge-ui/public/lib/
+homebridge-ui/public/kit.css
+homebridge-ui/public/kit.js
