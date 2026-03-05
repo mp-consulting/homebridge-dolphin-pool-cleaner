@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.10] - 2026-03-05
+
+### Changed
+
+- **Config UI**: Migrated to `@mp-consulting/homebridge-ui-kit` design system (Bootstrap 5.3, Bootstrap Icons)
+- **Config UI**: Replaced emoji icons with Bootstrap Icons (`bi-droplet-half`, `bi-lock-fill`, `bi-check-lg`, `bi-info-circle-fill`, `bi-clock`) and inline SVG edit button with `bi-pencil`
+- **Config UI**: Added dark/light mode theme detection from system preference and Homebridge user settings via `data-bs-theme` attribute
+- **Config UI**: Replaced `@media (prefers-color-scheme: dark)` CSS blocks with `[data-bs-theme="dark"]` selectors for Bootstrap-compatible dark mode
+- **Config UI**: Added footer with GitHub and npm links
+- **package.json**: Harmonized engines (`^20.0.0 || ^22.0.0 || ^24.0.0`), added `copy:ui-kit` script, added `test:ui` script
+
 ## [1.0.9] - 2026-02-17
 
 ### Security

@@ -18,16 +18,14 @@
 }
 
 /* Dark mode */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text-color: #e9ecef;
-    --text-muted: #adb5bd;
-    --bg-color: #1a1a1a;
-    --bg-secondary: #2d2d2d;
-    --border-color: #444;
-    --input-border: #555;
-    --shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-  }
+[data-bs-theme="dark"] {
+  --text-color: #e9ecef;
+  --text-muted: #adb5bd;
+  --bg-color: #1a1a1a;
+  --bg-secondary: #2d2d2d;
+  --border-color: #444;
+  --input-border: #555;
+  --shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 * {
@@ -232,10 +230,8 @@ body {
   min-height: 180px;
 }
 
-@media (prefers-color-scheme: dark) {
-  .robot-image-container {
-    background: linear-gradient(180deg, #1e3a4c 0%, #0d2233 100%);
-  }
+[data-bs-theme="dark"] .robot-image-container {
+  background: linear-gradient(180deg, #1e3a4c 0%, #0d2233 100%);
 }
 
 .robot-image {
@@ -287,11 +283,9 @@ body {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-@media (prefers-color-scheme: dark) {
-  .robot-status-badge {
-    background: rgba(45, 45, 45, 0.95);
-    color: #e9ecef;
-  }
+[data-bs-theme="dark"] .robot-status-badge {
+  background: rgba(45, 45, 45, 0.95);
+  color: #e9ecef;
 }
 
 .status-dot {
@@ -504,10 +498,8 @@ body {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
 }
 
-@media (prefers-color-scheme: dark) {
-  .robot-card-clickable:hover {
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
-  }
+[data-bs-theme="dark"] .robot-card-clickable:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
 }
 
 /* Edit button on robot card */
@@ -536,16 +528,14 @@ body {
   transform: scale(1.1);
 }
 
-@media (prefers-color-scheme: dark) {
-  .edit-robot-btn {
-    background: rgba(45, 45, 45, 0.95);
-    color: var(--primary-color);
-  }
+[data-bs-theme="dark"] .edit-robot-btn {
+  background: rgba(45, 45, 45, 0.95);
+  color: var(--primary-color);
+}
 
-  .edit-robot-btn:hover {
-    background: var(--primary-color);
-    color: #fff;
-  }
+[data-bs-theme="dark"] .edit-robot-btn:hover {
+  background: var(--primary-color);
+  color: #fff;
 }
 
 /* Account email in robot card */
@@ -565,11 +555,9 @@ body {
   margin-bottom: 14px;
 }
 
-@media (prefers-color-scheme: dark) {
-  .mode-info-box {
-    background: linear-gradient(135deg, rgba(0, 122, 255, 0.15) 0%, rgba(0, 122, 255, 0.05) 100%);
-    border: 1px solid rgba(0, 122, 255, 0.3);
-  }
+[data-bs-theme="dark"] .mode-info-box {
+  background: linear-gradient(135deg, rgba(0, 122, 255, 0.15) 0%, rgba(0, 122, 255, 0.05) 100%);
+  border: 1px solid rgba(0, 122, 255, 0.3);
 }
 
 .mode-info-header {

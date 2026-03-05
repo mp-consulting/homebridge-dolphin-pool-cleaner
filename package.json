@@ -1,19 +1,21 @@
 {
   "name": "@mp-consulting/homebridge-dolphin-pool-cleaner",
   "displayName": "Dolphin Pool Cleaner",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "description": "Homebridge plugin for MyDolphin Plus pool cleaning robots (Maytronics)",
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
-    "build": "rimraf ./dist && tsc && npm run copy-assets",
-    "copy-assets": "mkdir -p ./dist/protocol && cp ./src/protocol/*.json ./dist/protocol/",
     "lint": "eslint . --max-warnings=0",
+    "watch": "npm run build && npm link && nodemon",
+    "copy:ui-kit": "mkdir -p homebridge-ui/public/lib && cp node_modules/@mp-consulting/homebridge-ui-kit/dist/kit.css homebridge-ui/public/lib/ && cp node_modules/@mp-consulting/homebridge-ui-kit/dist/kit.js homebridge-ui/public/lib/",
+    "copy-assets": "mkdir -p ./dist/protocol && cp ./src/protocol/*.json ./dist/protocol/",
+    "build": "npm run copy:ui-kit && rimraf ./dist && tsc && npm run copy-assets",
+    "prepublishOnly": "npm run lint && npm run build",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "watch": "npm run build && npm link && nodemon",
-    "prepublishOnly": "npm run lint && npm run build"
+    "test:ui": "vitest --ui"
   },
   "keywords": [
     "homebridge-plugin",
@@ -36,8 +38,8 @@
   "author": "MP Consulting",
   "license": "MIT",
   "engines": {
-    "node": ">=18.0.0",
-    "homebridge": ">=1.6.0"
+    "node": "^20.0.0 || ^22.0.0 || ^24.0.0",
+    "homebridge": "^1.8.0 || ^2.0.0-beta.0"
   },
   "repository": {
     "type": "git",
@@ -50,7 +52,6 @@
     "type": "paypal",
     "url": "https://paypal.me/mickaelpalma"
   },
-  "homepage": "https://github.com/mp-consulting/homebridge-dolphin-pool-cleaner#readme",
   "dependencies": {
     "@aws-sdk/client-cognito-identity-provider": "^3.540.0",
     "@aws-sdk/client-iot": "^3.971.0",
@@ -60,6 +61,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
+    "@mp-consulting/homebridge-ui-kit": "^1.0.0",
     "@types/node": "^24.0.0",
     "@vitest/coverage-v8": "^4.0.18",
     "eslint": "^9.39.2",

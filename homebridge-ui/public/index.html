@@ -4,6 +4,18 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dolphin Pool Cleaner Setup</title>
+  <script>
+    (function() {
+      try {
+        if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+          document.documentElement.dataset.bsTheme = 'dark';
+        }
+      } catch(e) {}
+    })();
+  </script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="lib/kit.css">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -11,7 +23,7 @@
     <!-- Step 0: Configured Robots (shown when config exists) -->
     <div id="step-configured" class="wizard-step">
       <div class="step-header">
-        <div class="step-icon">🐬</div>
+        <div class="step-icon"><i class="bi bi-droplet-half"></i></div>
         <h2>Your Dolphin Robots</h2>
         <p class="step-description">Manage your configured pool robots</p>
       </div>
@@ -29,7 +41,7 @@
     <!-- Step 1: Login (Email only for CUSTOM_AUTH) -->
     <div id="step-login" class="wizard-step active">
       <div class="step-header">
-        <div class="step-icon">🐬</div>
+        <div class="step-icon"><i class="bi bi-droplet-half"></i></div>
         <h2>Connect Your MyDolphin Account</h2>
         <p class="step-description">Enter your MyDolphin Plus email address. A verification code will be sent to you.</p>
       </div>
@@ -55,7 +67,7 @@
     <!-- Step 1b: OTP Verification -->
     <div id="step-otp" class="wizard-step">
       <div class="step-header">
-        <div class="step-icon">🔐</div>
+        <div class="step-icon"><i class="bi bi-lock-fill"></i></div>
         <h2>Verification Required</h2>
         <p class="step-description" id="otp-message">Please enter the verification code sent to your email.</p>
       </div>
@@ -83,7 +95,7 @@
     <!-- Step 2: Robot Found -->
     <div id="step-robot" class="wizard-step">
       <div class="step-header">
-        <div class="step-icon success">✓</div>
+        <div class="step-icon success"><i class="bi bi-check-lg"></i></div>
         <h2>Robot Found!</h2>
         <p class="step-description">We found your Dolphin pool robot.</p>
       </div>
@@ -218,14 +230,14 @@
 
             <div id="cleaning-mode-info" class="mode-info-box">
               <div class="mode-info-header">
-                <span class="mode-info-icon">ℹ️</span>
+                <span class="mode-info-icon"><i class="bi bi-info-circle-fill"></i></span>
                 <span class="mode-info-title">Mode Details</span>
               </div>
               <div id="mode-description" class="mode-info-content">
                 Full pool cleaning covering floor, walls, and waterline. Most thorough cleaning option.
               </div>
               <div id="mode-duration" class="mode-info-duration">
-                <span class="duration-icon">⏱️</span>
+                <span class="duration-icon"><i class="bi bi-clock"></i></span>
                 <span id="mode-duration-text">Duration: ~150 minutes</span>
               </div>
             </div>
@@ -267,7 +279,7 @@
     <!-- Step 3: Success -->
     <div id="step-success" class="wizard-step">
       <div class="step-header">
-        <div class="step-icon success">✓</div>
+        <div class="step-icon success"><i class="bi bi-check-lg"></i></div>
         <h2>Setup Complete!</h2>
         <p class="step-description">Your Dolphin pool robot has been configured.</p>
       </div>
@@ -288,6 +300,17 @@
     </div>
   </div>
 
+  <div class="mp-footer">
+    <a href="https://github.com/mp-consulting/homebridge-dolphin-pool-cleaner" target="_blank" rel="noopener">
+      <i class="bi bi-github me-1"></i>GitHub
+    </a>
+    <a href="https://www.npmjs.com/package/@mp-consulting/homebridge-dolphin-pool-cleaner" target="_blank" rel="noopener">
+      <i class="bi bi-npm me-1"></i>npm
+    </a>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="lib/kit.js"></script>
   <script src="wizard.js"></script>
 </body>
 </html>
