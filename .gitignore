@@ -45,3 +45,6 @@ tmp/
 # BMad agent files
 _bmad/
 _bmad-output/
+
+# Generated UI kit assets (copied from node_modules by copy:ui-kit script)
+homebridge-ui/public/lib/
