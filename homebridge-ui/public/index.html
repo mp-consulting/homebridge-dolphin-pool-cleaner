@@ -13,6 +13,7 @@
       } catch(e) {}
     })();
   </script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <link rel="stylesheet" href="lib/kit.css">
   <link rel="stylesheet" href="styles.css">
@@ -24,16 +25,16 @@
       <div class="step-header">
         <div class="step-icon"><i class="bi bi-droplet-half"></i></div>
         <h2>Your Dolphin Robots</h2>
-        <p class="step-description">Manage your configured pool robots</p>
+        <p class="step-description text-muted small">Manage your configured pool robots</p>
       </div>
 
       <div id="configured-robots-list">
         <!-- Robot cards will be inserted here by JavaScript -->
       </div>
 
-      <div class="button-group">
-        <button type="button" class="btn btn-secondary" id="add-robot-btn">Add Another Robot</button>
-        <button type="button" class="btn btn-primary" id="reconfigure-btn">Reconfigure</button>
+      <div class="d-flex gap-2 mt-3">
+        <button type="button" class="btn btn-secondary flex-fill" id="add-robot-btn">Add Another Robot</button>
+        <button type="button" class="btn btn-primary flex-fill" id="reconfigure-btn">Reconfigure</button>
       </div>
     </div>
 
@@ -42,22 +43,23 @@
       <div class="step-header">
         <div class="step-icon"><i class="bi bi-droplet-half"></i></div>
         <h2>Connect Your MyDolphin Account</h2>
-        <p class="step-description">Enter your MyDolphin Plus email address. A verification code will be sent to you.</p>
+        <p class="step-description text-muted small">Enter your MyDolphin Plus email address. A verification code will be sent to you.</p>
       </div>
 
       <form id="login-form">
-        <div class="form-group">
-          <label for="email">Email</label>
-          <input type="email" id="email" name="email" placeholder="your@email.com" required>
-          <small class="help-text">The email associated with your MyDolphin Plus account</small>
+        <div class="mb-3">
+          <label for="email" class="form-label">Email</label>
+          <input type="email" id="email" name="email" class="form-control" placeholder="your@email.com" required>
+          <div class="form-text">The email associated with your MyDolphin Plus account</div>
         </div>
 
-        <div id="login-error" class="error-message" style="display: none;"></div>
+        <div id="login-error" class="alert alert-danger" style="display: none;"></div>
 
-        <div class="button-group">
-          <button type="submit" class="btn btn-primary" id="login-btn">
+        <div class="d-flex gap-2 mt-3">
+          <button type="button" class="btn btn-secondary flex-fill d-none" id="cancel-add-robot-btn">Cancel</button>
+          <button type="submit" class="btn btn-primary flex-fill" id="login-btn">
+            <span class="spinner-border spinner-border-sm me-1 d-none btn-loading" aria-hidden="true"></span>
             <span class="btn-text">Send Verification Code</span>
-            <span class="btn-loading" style="display: none;">Sending...</span>
           </button>
         </div>
       </form>
@@ -68,24 +70,24 @@
       <div class="step-header">
         <div class="step-icon"><i class="bi bi-lock-fill"></i></div>
         <h2>Verification Required</h2>
-        <p class="step-description" id="otp-message">Please enter the verification code sent to your email.</p>
+        <p class="step-description text-muted small" id="otp-message">Please enter the verification code sent to your email.</p>
       </div>
 
       <form id="otp-form">
-        <div class="form-group">
-          <label for="otp-code">Verification Code</label>
-          <input type="text" id="otp-code" name="otpCode" placeholder="Enter code" required
+        <div class="mb-3">
+          <label for="otp-code" class="form-label">Verification Code</label>
+          <input type="text" id="otp-code" name="otpCode" class="form-control" placeholder="Enter code" required
                  autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]*" maxlength="6">
-          <small class="help-text">Check your email or phone for the verification code</small>
+          <div class="form-text">Check your email or phone for the verification code</div>
         </div>
 
-        <div id="otp-error" class="error-message" style="display: none;"></div>
+        <div id="otp-error" class="alert alert-danger" style="display: none;"></div>
 
-        <div class="button-group">
-          <button type="button" class="btn btn-secondary" id="otp-back-btn">Back</button>
-          <button type="submit" class="btn btn-primary" id="otp-btn">
+        <div class="d-flex gap-2 mt-3">
+          <button type="button" class="btn btn-secondary flex-fill" id="otp-back-btn">Back</button>
+          <button type="submit" class="btn btn-primary flex-fill" id="otp-btn">
+            <span class="spinner-border spinner-border-sm me-1 d-none btn-loading" aria-hidden="true"></span>
             <span class="btn-text">Verify</span>
-            <span class="btn-loading" style="display: none;">Verifying...</span>
           </button>
         </div>
       </form>
@@ -96,12 +98,12 @@
       <div class="step-header">
         <div class="step-icon success"><i class="bi bi-check-lg"></i></div>
         <h2>Robot Found!</h2>
-        <p class="step-description">We found your Dolphin pool robot.</p>
+        <p class="step-description text-muted small">We found your Dolphin pool robot.</p>
       </div>
 
-      <div class="edit-form-layout">
+      <div class="row g-3 mb-3">
         <!-- Left Column: Robot Details -->
-        <div class="edit-form-left">
+        <div class="col-md-6">
           <div class="robot-card">
             <div class="robot-image-container">
               <!-- Actual robot image from Maytronics API (hidden by default) -->
@@ -183,10 +185,10 @@
               </div>
             </div>
             <div class="robot-card-content">
-              <div class="form-group">
-                <label for="display-name">Display Name</label>
-                <input type="text" id="display-name" placeholder="My Pool Robot">
-                <small class="help-text">Name shown in HomeKit</small>
+              <div class="mb-3">
+                <label for="display-name" class="form-label">Display Name</label>
+                <input type="text" id="display-name" class="form-control" placeholder="My Pool Robot">
+                <div class="form-text">Name shown in HomeKit</div>
               </div>
               <div class="robot-card-details">
                 <div class="robot-detail-item">
@@ -207,71 +209,69 @@
         </div>
 
         <!-- Right Column: Settings -->
-        <div class="edit-form-right">
-          <div class="options-section">
-            <h4>Settings</h4>
+        <div class="col-md-6">
+          <div class="card h-100">
+            <div class="card-body">
+              <h6 class="fw-semibold border-bottom pb-2 mb-3">Settings</h6>
 
-            <div class="form-group">
-              <label for="cleaning-mode">Default Cleaning Mode</label>
-              <select id="cleaning-mode">
-                <option value="all" selected>All Surfaces</option>
-                <option value="floor">Floor Only</option>
-                <option value="wall">Walls Only</option>
-                <option value="water">Waterline</option>
-                <option value="short">Short/Fast</option>
-                <option value="ultra">Ultra Clean</option>
-                <option value="cove">Cove</option>
-                <option value="spot">Spot</option>
-                <option value="regular">Regular</option>
-              </select>
-              <small class="help-text">Mode used when starting from HomeKit</small>
-            </div>
-
-            <div id="cleaning-mode-info" class="mode-info-box">
-              <div class="mode-info-header">
-                <span class="mode-info-icon"><i class="bi bi-info-circle-fill"></i></span>
-                <span class="mode-info-title">Mode Details</span>
+              <div class="mb-3">
+                <label for="cleaning-mode" class="form-label">Default Cleaning Mode</label>
+                <select id="cleaning-mode" class="form-select">
+                  <option value="all" selected>All Surfaces</option>
+                  <option value="floor">Floor Only</option>
+                  <option value="wall">Walls Only</option>
+                  <option value="water">Waterline</option>
+                  <option value="short">Short/Fast</option>
+                  <option value="ultra">Ultra Clean</option>
+                  <option value="cove">Cove</option>
+                  <option value="spot">Spot</option>
+                  <option value="regular">Regular</option>
+                </select>
+                <div class="form-text">Mode used when starting from HomeKit</div>
               </div>
-              <div id="mode-description" class="mode-info-content">
-                Full pool cleaning covering floor, walls, and waterline. Most thorough cleaning option.
+
+              <div id="cleaning-mode-info" class="alert alert-info py-2 text-start">
+                <div class="mode-info-header">
+                  <span class="mode-info-icon"><i class="bi bi-info-circle-fill"></i></span>
+                  <span class="mode-info-title">Mode Details</span>
+                </div>
+                <div id="mode-description" class="mode-info-content">
+                  Full pool cleaning covering floor, walls, and waterline. Most thorough cleaning option.
+                </div>
+                <div id="mode-duration" class="mode-info-duration">
+                  <span class="duration-icon"><i class="bi bi-clock"></i></span>
+                  <span id="mode-duration-text">Duration: ~150 minutes</span>
+                </div>
               </div>
-              <div id="mode-duration" class="mode-info-duration">
-                <span class="duration-icon"><i class="bi bi-clock"></i></span>
-                <span id="mode-duration-text">Duration: ~150 minutes</span>
+
+              <div class="mb-3">
+                <label for="polling-interval" class="form-label">Polling Interval</label>
+                <select id="polling-interval" class="form-select">
+                  <option value="30">30 seconds</option>
+                  <option value="60" selected>60 seconds (Recommended)</option>
+                  <option value="120">2 minutes</option>
+                  <option value="300">5 minutes</option>
+                </select>
+                <div class="form-text">How often to check robot status</div>
               </div>
-            </div>
 
-            <div class="form-group">
-              <label for="polling-interval">Polling Interval</label>
-              <select id="polling-interval">
-                <option value="30">30 seconds</option>
-                <option value="60" selected>60 seconds (Recommended)</option>
-                <option value="120">2 minutes</option>
-                <option value="300">5 minutes</option>
-              </select>
-              <small class="help-text">How often to check robot status</small>
-            </div>
+              <div class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" id="enable-temperature" checked>
+                <label class="form-check-label" for="enable-temperature">Enable Water Temperature Sensor</label>
+              </div>
 
-            <div class="form-group checkbox-group">
-              <label class="checkbox-label">
-                <input type="checkbox" id="enable-temperature" checked>
-                <span>Enable Water Temperature Sensor</span>
-              </label>
-            </div>
-
-            <div class="form-group checkbox-group">
-              <label class="checkbox-label">
-                <input type="checkbox" id="enable-filter" checked>
-                <span>Enable Filter Status</span>
-              </label>
+              <div class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" id="enable-filter" checked>
+                <label class="form-check-label" for="enable-filter">Enable Filter Status</label>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      <div class="button-group">
-        <button type="button" class="btn btn-secondary" id="back-btn">Back</button>
-        <button type="button" class="btn btn-primary" id="save-btn">Save Configuration</button>
+      <div class="d-flex gap-2 mt-3">
+        <button type="button" class="btn btn-secondary flex-fill" id="back-btn">Back</button>
+        <button type="button" class="btn btn-primary flex-fill" id="save-btn">Save Configuration</button>
       </div>
     </div>
 
@@ -280,12 +280,12 @@
       <div class="step-header">
         <div class="step-icon success"><i class="bi bi-check-lg"></i></div>
         <h2>Setup Complete!</h2>
-        <p class="step-description">Your Dolphin pool robot has been configured.</p>
+        <p class="step-description text-muted small">Your Dolphin pool robot has been configured.</p>
       </div>
 
-      <div class="success-message">
-        <p>Your robot will now appear in HomeKit. You can:</p>
-        <ul>
+      <div class="alert alert-success text-start">
+        <p class="mb-2">Your robot will now appear in HomeKit. You can:</p>
+        <ul class="mb-0">
           <li>Turn cleaning on/off with the switch</li>
           <li>View water temperature</li>
           <li>Check filter status</li>
@@ -293,8 +293,8 @@
         </ul>
       </div>
 
-      <div class="button-group">
-        <button type="button" class="btn btn-primary" id="done-btn">Done</button>
+      <div class="d-flex gap-2 mt-3">
+        <button type="button" class="btn btn-primary flex-fill" id="done-btn">Done</button>
       </div>
     </div>
   </div>
@@ -308,6 +308,7 @@
     </a>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="lib/kit.js"></script>
   <script src="wizard.js"></script>
 </body>

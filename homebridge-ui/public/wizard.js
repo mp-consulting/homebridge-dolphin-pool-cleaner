@@ -169,7 +169,10 @@
       return document.getElementById('done-btn'); 
     },
     get addRobotBtn() {
-      return document.getElementById('add-robot-btn'); 
+      return document.getElementById('add-robot-btn');
+    },
+    get cancelAddRobotBtn() {
+      return document.getElementById('cancel-add-robot-btn');
     },
     get reconfigureBtn() {
       return document.getElementById('reconfigure-btn'); 
@@ -323,15 +326,18 @@
 
   function setLoading(btn, loading) {
     const text = btn.querySelector('.btn-text');
-    const loadingText = btn.querySelector('.btn-loading');
-
+    const spinner = btn.querySelector('.btn-loading');
     if (loading) {
-      text.style.display = 'none';
-      loadingText.style.display = 'inline-flex';
+      text.classList.add('d-none');
+      if (spinner) {
+        spinner.classList.remove('d-none');
+      }
       btn.disabled = true;
     } else {
-      text.style.display = 'inline';
-      loadingText.style.display = 'none';
+      text.classList.remove('d-none');
+      if (spinner) {
+        spinner.classList.add('d-none');
+      }
       btn.disabled = false;
     }
   }
@@ -661,9 +667,6 @@
           <span class="status-dot green"></span>
           <span>Configured</span>
         </div>
-        <button type="button" class="edit-robot-btn" title="Edit settings">
-          <i class="bi bi-pencil"></i>
-        </button>
       </div>
       <div class="robot-card-content">
         <h3 class="robot-card-name">${safeName}</h3>
@@ -687,12 +690,6 @@
         </div>
       </div>
     `;
-
-    const editBtn = card.querySelector('.edit-robot-btn');
-    editBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      editDevice(deviceIndex);
-    });
 
     card.addEventListener('click', () => editDevice(deviceIndex));
 
@@ -787,18 +784,28 @@
     dom.saveBtn.addEventListener('click', handleSave);
     dom.doneBtn.addEventListener('click', handleDone);
 
-    dom.addRobotBtn?.addEventListener('click', () => showStep('login'));
-    dom.reconfigureBtn?.addEventListener('click', () => showStep('login'));
+    dom.addRobotBtn?.addEventListener('click', () => {
+      dom.cancelAddRobotBtn?.classList.remove('d-none');
+      showStep('login');
+    });
+    dom.reconfigureBtn?.addEventListener('click', () => {
+      dom.cancelAddRobotBtn?.classList.remove('d-none');
+      showStep('login');
+    });
+    dom.cancelAddRobotBtn?.addEventListener('click', () => {
+      dom.cancelAddRobotBtn.classList.add('d-none');
+      showStep('configured');
+    });
 
     dom.cleaningMode?.addEventListener('change', (e) => updateModeInfo(e.target.value));
   }
 
   function init() {
     detectDarkMode();
-    homebridge.getUserSettings().then((settings) => {
+    setupEventListeners();
+    homebridge.getUserSettings?.().then?.((settings) => {
       document.documentElement.dataset.bsTheme = settings.colorScheme === 'dark' ? 'dark' : 'light';
     }).catch(() => {});
-    setupEventListeners();
     loadSavedConfig();
 
     // Initialize cleaning mode info

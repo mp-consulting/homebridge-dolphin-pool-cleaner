@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.11] - 2026-03-05
+
+### Fixed
+
+- **Config UI**: Fixed black screen on form submit — `homebridge.getUserSettings` throwing when unavailable caused `init()` to abort before event listeners were registered, leaving forms without `preventDefault()` so the browser navigated the iframe
+- **UI server**: Fixed `authenticate-user` endpoint being called as GET instead of POST — empty string body `''` evaluated as falsy, so `body ? 'POST' : 'GET'` sent a GET; changed to `body != null` check
+
+### Changed
+
+- **Config UI**: Rewrote wizard HTML/CSS to use Bootstrap 5.3 natively — eliminates conflicts between custom CSS and Bootstrap
+- **Config UI**: Configured robots list card uses 50/50 horizontal layout with image left, details right
+- **Config UI**: Added Cancel button to login step when navigating from "Add Another Robot" or "Reconfigure"
+- **Config UI**: Mode details info box styled with left accent border
+- **Config UI**: Detail values truncate with ellipsis instead of wrapping
+
 ## [1.0.10] - 2026-03-05
 
 ### Changed
@@ -192,6 +207,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Uses AWS SDK v3 for Cognito and IoT
 - MQTT 5.x for real-time communication
 
+[1.0.11]: https://github.com/mp-consulting/homebridge-dolphin-pool-cleaner/releases/tag/v1.0.11
+[1.0.10]: https://github.com/mp-consulting/homebridge-dolphin-pool-cleaner/releases/tag/v1.0.10
 [1.0.9]: https://github.com/mp-consulting/homebridge-dolphin-pool-cleaner/releases/tag/v1.0.9
 [1.0.8]: https://github.com/mp-consulting/homebridge-dolphin-pool-cleaner/releases/tag/v1.0.8
 [1.0.7]: https://github.com/mp-consulting/homebridge-dolphin-pool-cleaner/releases/tag/v1.0.7

@@ -57,7 +57,7 @@ class HttpClient {
    */
   static async maytronicsRequest(endpoint, idToken, body = null) {
     const options = {
-      method: body ? 'POST' : 'GET',
+      method: body != null ? 'POST' : 'GET',
       headers: {
         'Authorization': `Bearer ${idToken}`,
         'AppKey': APP_KEY,
@@ -66,7 +66,7 @@ class HttpClient {
       signal: AbortSignal.timeout(REQUEST_TIMEOUT),
     };
 
-    if (body) {
+    if (body != null) {
       options.body = body;
     }
 
