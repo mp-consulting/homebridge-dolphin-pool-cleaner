@@ -91,6 +91,10 @@ export const DEFAULT_CYCLE_TIME_MINUTES = 120;
 // State refresh delay after commands
 export const STATE_REFRESH_DELAY_MS = 3000;
 
+// Grace period to suppress switch state updates after a command, giving the robot
+// time to update its AWS IoT shadow before incoming MQTT messages are trusted again
+export const COMMAND_GRACE_PERIOD_MS = 15_000;
+
 // Timestamp validation
 export const MIN_VALID_UNIX_TIMESTAMP = 1000000000; // Sept 2001
 

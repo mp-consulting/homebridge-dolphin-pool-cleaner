@@ -198,7 +198,7 @@ function parseNewFormat(reported: RawShadowReported): Partial<ParsedRobotState> 
       const elapsedMinutes = (now - cycleStartTime) / SECONDS_PER_MINUTE;
 
       // Only mark as cleaning if cycle started recently and is within duration
-      if (elapsedMinutes >= 0 && elapsedMinutes < cycleTime && state.isCleaning !== false) {
+      if (elapsedMinutes >= 0 && elapsedMinutes < cycleTime && state.isCleaning === undefined) {
         state.isCleaning = true;
         state.cycleStartTime = new Date(cycleStartTime * MILLISECONDS_PER_SECOND);
         state.cycleTimeRemaining = Math.max(0, cycleTime - elapsedMinutes);

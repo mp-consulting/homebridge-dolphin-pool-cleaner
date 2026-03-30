@@ -6,6 +6,7 @@
 import type { PlatformAccessory, Service, CharacteristicValue } from 'homebridge';
 import type { DolphinPoolCleanerPlatform, DeviceConfig } from '../platform.js';
 import type { DolphinDevice, RobotState } from '../devices/dolphinDevice.js';
+import { COMMAND_GRACE_PERIOD_MS } from '../config/constants.js';
 
 export class DolphinAccessory {
   private readonly platform: DolphinPoolCleanerPlatform;
@@ -15,7 +16,6 @@ export class DolphinAccessory {
   private readonly switchService: Service;
   private readonly temperatureService?: Service;
   private readonly filterService?: Service;
-  private isUpdating = false;
   private lastCommandTime = 0;
 
   constructor(
@@ -137,17 +137,16 @@ export class DolphinAccessory {
    * Handle device state changes
    */
   handleStateChange(state: RobotState): void {
-    if (this.isUpdating || (Date.now() - this.lastCommandTime < 15_000)) {
-      return;
-    }
     this.platform.log.debug(
       `State change received: isCleaning=${state.isCleaning}, mode=${state.cleaningMode}, temp=${state.temperature}`,
     );
-    // Update switch state
-    this.switchService.updateCharacteristic(
-      this.platform.Characteristic.On,
-      state.isCleaning,
-    );
+    // Suppress switch updates during the grace period after a command
+    if (Date.now() - this.lastCommandTime >= COMMAND_GRACE_PERIOD_MS) {
+      this.switchService.updateCharacteristic(
+        this.platform.Characteristic.On,
+        state.isCleaning,
+      );
+    }
     // Update temperature if available
     if (this.temperatureService && state.temperature !== undefined) {
       this.temperatureService.updateCharacteristic(
@@ -193,7 +192,6 @@ export class DolphinAccessory {
     }
     this.switchService.getCharacteristic(this.platform.Characteristic.On).updateValue(targetOn);
     this.lastCommandTime = Date.now();
-    this.isUpdating = true;
     try {
       if (targetOn) {
         const mode = this.deviceConfig?.cleaningMode || 'all';
@@ -207,8 +205,7 @@ export class DolphinAccessory {
         error,
       );
       this.switchService.getCharacteristic(this.platform.Characteristic.On).updateValue(!targetOn);
-    } finally {
-      this.isUpdating = false;
+      this.lastCommandTime = 0;
     }
   }
   /**
