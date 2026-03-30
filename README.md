@@ -157,6 +157,10 @@ The plugin creates these HomeKit accessories for each robot:
 
 Your account has two-factor authentication enabled. Use the setup wizard which handles OTP verification, or temporarily disable 2FA in the MyDolphin app.
 
+### Switch snaps back after toggling
+
+This was fixed in v1.0.14. The plugin now applies an optimistic UI update (HomeKit reflects the new state immediately) and suppresses stale MQTT shadow updates for 15 seconds after a command, preventing flicker. Update to the latest version.
+
 ### Robot not responding to commands
 
 1. Check robot's power supply is plugged in and has WiFi connection

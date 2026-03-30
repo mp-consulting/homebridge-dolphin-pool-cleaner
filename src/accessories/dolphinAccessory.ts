@@ -16,6 +16,7 @@ export class DolphinAccessory {
   private readonly temperatureService?: Service;
   private readonly filterService?: Service;
   private isUpdating = false;
+  private lastCommandTime = 0;
 
   constructor(
     platform: DolphinPoolCleanerPlatform,
@@ -136,7 +137,7 @@ export class DolphinAccessory {
    * Handle device state changes
    */
   handleStateChange(state: RobotState): void {
-    if (this.isUpdating) {
+    if (this.isUpdating || (Date.now() - this.lastCommandTime < 15_000)) {
       return;
     }
     this.platform.log.debug(
@@ -190,6 +191,8 @@ export class DolphinAccessory {
     if (targetOn === state.isCleaning) {
       return;
     }
+    this.switchService.getCharacteristic(this.platform.Characteristic.On).updateValue(targetOn);
+    this.lastCommandTime = Date.now();
     this.isUpdating = true;
     try {
       if (targetOn) {
@@ -203,6 +206,7 @@ export class DolphinAccessory {
         `Failed to ${targetOn ? 'start' : 'stop'} cleaning:`,
         error,
       );
+      this.switchService.getCharacteristic(this.platform.Characteristic.On).updateValue(!targetOn);
     } finally {
       this.isUpdating = false;
     }

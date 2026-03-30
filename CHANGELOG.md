@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.14] - 2026-03-30
+
+### Fixed
+
+- **Fixed cycleInfo timer overriding `pwsState: off`** - The cycle timer unconditionally set `isCleaning = true` if the elapsed time was within the cycle window, even when AWS IoT had already reported `pwsState: off`. The robot appeared stuck in cleaning state until the full cycle duration expired. Added guard to only infer cleaning from cycle timer when `pwsState` hasn't explicitly determined the robot is off. (#2)
+
+### Added
+
+- **Optimistic UI update for switch control** - HomeKit now reflects the new switch state immediately when toggling, instead of waiting for the AWS IoT round-trip. If the command fails, the state reverts automatically. Prevents the button snap-back caused by HomeKit's GET-after-SET timeout. (#3)
+- **15-second grace period after commands** - Incoming MQTT shadow updates are suppressed for 15 seconds after a command is issued, giving the robot time to update its shadow state. Prevents stale MQTT messages from flickering the switch back to the old state. (#4)
+
 ## [1.0.13] - 2026-03-30
 
 ### Changed
@@ -219,6 +230,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Uses AWS SDK v3 for Cognito and IoT
 - MQTT 5.x for real-time communication
 
+[1.0.14]: https://github.com/mp-consulting/homebridge-dolphin-pool-cleaner/releases/tag/v1.0.14
 [1.0.13]: https://github.com/mp-consulting/homebridge-dolphin-pool-cleaner/releases/tag/v1.0.13
 [1.0.12]: https://github.com/mp-consulting/homebridge-dolphin-pool-cleaner/releases/tag/v1.0.12
 [1.0.11]: https://github.com/mp-consulting/homebridge-dolphin-pool-cleaner/releases/tag/v1.0.11
