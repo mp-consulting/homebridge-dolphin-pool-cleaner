@@ -159,7 +159,7 @@ Your account has two-factor authentication enabled. Use the setup wizard which h
 
 ### Switch snaps back after toggling
 
-This was fixed in v1.0.14. The plugin now applies an optimistic UI update (HomeKit reflects the new state immediately) and suppresses stale MQTT shadow updates for 15 seconds after a command, preventing flicker. Update to the latest version.
+Fixed in v1.0.14, refined in v1.0.15. The plugin applies an optimistic UI update (HomeKit reflects the new state immediately) and suppresses stale MQTT switch updates for 15 seconds after a command, while still allowing temperature and filter updates through. Update to the latest version.
 
 ### Robot not responding to commands
 

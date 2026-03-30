@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.15] - 2026-03-30
+
+### Changed
+
+- **Refined command grace period** - Grace period now only suppresses switch state updates; temperature and filter updates continue flowing during the 15-second window. Removed redundant `isUpdating` flag in favour of timestamp-based `lastCommandTime`. On command failure, grace period resets immediately so the real state corrects without delay. (#4)
+- **Extracted grace period constant** - Replaced magic number with named `COMMAND_GRACE_PERIOD_MS` constant in `src/config/constants.ts`.
+- **Improved cycleInfo fallback semantics** - Changed guard from `!== false` to `=== undefined`, making the cycle timer an explicit fallback heuristic that only applies when `pwsState` hasn't set `isCleaning` at all, regardless of parse order. (#2)
+
 ## [1.0.14] - 2026-03-30
 
 ### Fixed
@@ -230,6 +238,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Uses AWS SDK v3 for Cognito and IoT
 - MQTT 5.x for real-time communication
 
+[1.0.15]: https://github.com/mp-consulting/homebridge-dolphin-pool-cleaner/releases/tag/v1.0.15
 [1.0.14]: https://github.com/mp-consulting/homebridge-dolphin-pool-cleaner/releases/tag/v1.0.14
 [1.0.13]: https://github.com/mp-consulting/homebridge-dolphin-pool-cleaner/releases/tag/v1.0.13
 [1.0.12]: https://github.com/mp-consulting/homebridge-dolphin-pool-cleaner/releases/tag/v1.0.12
