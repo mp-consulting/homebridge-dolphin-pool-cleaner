@@ -49,6 +49,7 @@ homebridge-ui/                  # Custom setup wizard UI
 - **Polling fallback** with configurable interval (30-600s, default 60s)
 - **Parser layer** decodes AWS Shadow state into device properties
 - **Command builder** constructs IoT commands from BLE command protocol definitions
+- **Custom UI**: Uses Homebridge custom UI framework (`homebridge-ui/`) for plugin configuration management
 
 ## Code Style
 
