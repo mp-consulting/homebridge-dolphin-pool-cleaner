@@ -408,6 +408,23 @@
   // Authentication Handlers
   // ============================================================================
 
+  // Wrap homebridge.request with a hard timeout so the UI never hangs forever on
+  // a stalled request (e.g. a flaky network or a blocked/stalled transport). On
+  // timeout we reject, which the callers surface as an error and clear the button
+  // spinner — instead of leaving it spinning indefinitely.
+  const REQUEST_TIMEOUT_MS = 30000;
+
+  function requestWithTimeout(path, body) {
+    let timer;
+    const timeout = new Promise((_, reject) => {
+      timer = setTimeout(
+        () => reject(new Error('The request timed out. Please check your connection and try again.')),
+        REQUEST_TIMEOUT_MS,
+      );
+    });
+    return Promise.race([homebridge.request(path, body), timeout]).finally(() => clearTimeout(timer));
+  }
+
   async function handleLogin(event) {
     event.preventDefault();
     hideError(dom.loginError);
@@ -422,7 +439,7 @@
     setLoading(dom.loginBtn, true);
 
     try {
-      const result = await homebridge.request('/authenticate', { email });
+      const result = await requestWithTimeout('/authenticate', { email });
 
       if (result.success) {
         handleAuthSuccess(result, email);
@@ -461,7 +478,7 @@
     setLoading(dom.otpBtn, true);
 
     try {
-      const result = await homebridge.request('/verify-otp', {
+      const result = await requestWithTimeout('/verify-otp', {
         email: state.pendingEmail,
         otpCode,
       });

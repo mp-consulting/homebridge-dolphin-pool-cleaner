@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.19] - 2026-07-04
+
+### Fixed
+
+- **Setup wizard hanging on the spinner in Safari / iPad** ([#5](https://github.com/mp-consulting/homebridge-dolphin-pool-cleaner/issues/5)): the custom UI loaded Bootstrap CSS/JS and the icon font from an external CDN (`cdn.jsdelivr.net`). On iPad Safari these requests are commonly blocked or stalled by content blockers or iCloud Private Relay, which broke the page (an inert `d-none` left the submit spinner permanently visible, and a stalled blocking `<script>` could prevent the wizard from initialising) — so entering an email just spun forever while it worked in Chrome. All assets are now self-hosted: Bootstrap CSS ships in the plugin (`homebridge-ui/public/lib/`, copied from a new `bootstrap` dev dependency), the unused Bootstrap JS bundle was removed, and the seven icon-font glyphs were replaced with inline SVGs — no external network requests remain.
+- **Setup wizard could spin indefinitely on a stalled request**: `homebridge.request` calls in the auth flow are now wrapped with a 30s timeout, so a stuck request surfaces a clear error instead of an endless spinner.
+
 ## [1.0.18] - 2026-04-17
 
 ### Changed

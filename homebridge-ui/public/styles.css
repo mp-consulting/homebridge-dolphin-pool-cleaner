@@ -298,3 +298,11 @@
     max-width: 480px;
   }
 }
+
+/* Inline Bootstrap-icons SVGs (self-hosted; no icon-font CDN).
+   Mirrors the bootstrap-icons font sizing: 1em, currentColor, baseline nudge. */
+svg.bi {
+  display: inline-block;
+  vertical-align: -0.125em;
+  fill: currentColor;
+}
