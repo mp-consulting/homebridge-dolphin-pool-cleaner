@@ -193,20 +193,33 @@ export class DolphinAccessory {
     this.switchService.getCharacteristic(this.platform.Characteristic.On).updateValue(targetOn);
     this.lastCommandTime = Date.now();
     try {
-      if (targetOn) {
-        const mode = this.deviceConfig?.cleaningMode || 'all';
-        await this.device.startCleaning(mode);
-      } else {
-        await this.device.stopCleaning();
+      const succeeded = targetOn
+        ? await this.device.startCleaning(this.deviceConfig?.cleaningMode || 'all')
+        : await this.device.stopCleaning();
+
+      // The cloud can refuse a command (e.g. sustained throttling) without
+      // throwing, in which case the robot never got it
+      if (!succeeded) {
+        this.platform.log.warn(
+          `The MyDolphin cloud did not accept the ${targetOn ? 'start' : 'stop'} command for ${this.device.name}`,
+        );
+        this.revertSwitch(targetOn);
       }
     } catch (error) {
       this.platform.log.error(
         `Failed to ${targetOn ? 'start' : 'stop'} cleaning:`,
         error,
       );
-      this.switchService.getCharacteristic(this.platform.Characteristic.On).updateValue(!targetOn);
-      this.lastCommandTime = 0;
+      this.revertSwitch(targetOn);
     }
+  }
+
+  /**
+   * Put the switch back where it was after a command that did not take effect
+   */
+  private revertSwitch(targetOn: boolean): void {
+    this.switchService.getCharacteristic(this.platform.Characteristic.On).updateValue(!targetOn);
+    this.lastCommandTime = 0;
   }
   /**
    * Get water temperature

@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.22] - 2026-08-04
+
+### Fixed
+
+- **`Shadow operation rejected: { code: 429, message: 'TOO_MANY_REQUESTS' }` warnings in the log**: the MyDolphin AWS account is shared by all users, so shadow requests can be throttled at any time. Throttled requests are now retried with exponential backoff and jitter instead of failing, and the rejection itself is logged at debug level — a warning is only emitted when all retries are exhausted, and at most once every 10 minutes.
+- **Fewer shadow requests, so throttling is hit less often**: requests are spaced at least 1s apart (a command burst no longer fires several at once), concurrent state refreshes share a single in-flight request, and polling is skipped when the robot already pushed its shadow over MQTT within the polling interval.
+- **Shadow responses are correlated with their request** via `clientToken`, so a rejection meant for another operation (or another app talking to the same robot) can no longer fail an unrelated request. In particular, the `update/accepted` message the robot triggers when reporting its own state is no longer mistaken for acceptance of a command the plugin sent.
+- **Plugin timers no longer delay Homebridge shutdown**: retry backoffs, shadow response timeouts, the polling interval and the deferred post-command refresh are `unref`'d, so a pending wait cannot hold the Node event loop open.
+- **A command the cloud refuses now reverts the switch in HomeKit** instead of leaving it On while the robot stays idle. Commands also retry less aggressively than polling does (2 attempts, shorter backoff), so a throttled start/stop cannot stall long enough for HomeKit to report "No Response".
+
 ## [1.0.19] - 2026-07-04
 
 ### Fixed
@@ -264,6 +274,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Uses AWS SDK v3 for Cognito and IoT
 - MQTT 5.x for real-time communication
 
+[1.0.22]: https://github.com/mp-consulting/homebridge-dolphin-pool-cleaner/releases/tag/v1.0.22
 [1.0.17]: https://github.com/mp-consulting/homebridge-dolphin-pool-cleaner/releases/tag/v1.0.17
 [1.0.16]: https://github.com/mp-consulting/homebridge-dolphin-pool-cleaner/releases/tag/v1.0.16
 [1.0.15]: https://github.com/mp-consulting/homebridge-dolphin-pool-cleaner/releases/tag/v1.0.15

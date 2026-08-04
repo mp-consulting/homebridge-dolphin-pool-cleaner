@@ -4,12 +4,21 @@
  * High-level API for robot control and state management.
  * Authentication is handled by AuthenticationManager.
  */
+import { EventEmitter } from 'events';
 import type { Logger } from 'homebridge';
 import { MQTTClient } from './mqttClient.js';
 import { AuthenticationManager } from './auth/authenticationManager.js';
 import type { AWSIoTCredentials, AuthConfig } from './auth/types.js';
 import type { RawShadowState } from '../parsers/types.js';
-import { ApiError, ErrorCode, getErrorMessage } from '../utils/errors.js';
+import { ApiError, ErrorCode, PluginError, getErrorMessage } from '../utils/errors.js';
+
+/**
+ * Shadow failures that resolve on their own and do not warrant an error log
+ */
+const TRANSIENT_SHADOW_ERRORS: ReadonlySet<ErrorCode> = new Set([
+  ErrorCode.MQTT_SHADOW_RATE_LIMITED,
+  ErrorCode.MQTT_NOT_CONNECTED,
+]);
 
 /**
  * Robot information from API
@@ -50,8 +59,10 @@ export type { AWSIoTCredentials as AWSCredentials };
  * Maytronics API Client
  *
  * Provides high-level methods for robot control and state management.
+ * Emits `shadowUpdate` whenever a shadow document arrives over MQTT, so callers
+ * can react to pushed state instead of polling for it.
  */
-export class MaytronicsAPI {
+export class MaytronicsAPI extends EventEmitter {
   private readonly log: Logger;
   private readonly authManager: AuthenticationManager;
   private mqttClient: MQTTClient | undefined;
@@ -64,6 +75,7 @@ export class MaytronicsAPI {
     iotRegion: string | undefined,
     refreshToken: string | undefined,
   ) {
+    super();
     this.log = log;
 
     const authConfig: AuthConfig = {
@@ -121,9 +133,11 @@ export class MaytronicsAPI {
       this.log,
     );
 
-    // Set up event handlers
+    // Set up event handlers. Re-emitting keeps listeners attached across
+    // reconnects, which recreate the underlying MQTT client.
     this.mqttClient.on('shadowUpdate', (shadow: RawShadowState) => {
       this.log.debug('Shadow update received:', JSON.stringify(shadow).substring(0, 200));
+      this.emit('shadowUpdate', shadow);
     });
 
     this.mqttClient.on('error', (error: Error) => {
@@ -183,9 +197,22 @@ export class MaytronicsAPI {
       this.log.debug('Thing Shadow received:', JSON.stringify(shadow).substring(0, 200) + '...');
       return shadow;
     } catch (error) {
-      this.log.error('Failed to get Thing Shadow:', getErrorMessage(error));
+      // Throttling and reconnects are transient: the MQTT client already reports
+      // sustained throttling, and the next poll picks the state back up
+      if (error instanceof PluginError && TRANSIENT_SHADOW_ERRORS.has(error.code)) {
+        this.log.debug('Thing Shadow request could not complete, keeping last known state:', getErrorMessage(error));
+      } else {
+        this.log.error('Failed to get Thing Shadow:', getErrorMessage(error));
+      }
       return undefined;
     }
+  }
+
+  /**
+   * Timestamp of the last shadow document received over MQTT (0 if none yet)
+   */
+  getLastShadowReceivedAt(): number {
+    return this.mqttClient?.getLastShadowReceivedAt() ?? 0;
   }
 
   /**

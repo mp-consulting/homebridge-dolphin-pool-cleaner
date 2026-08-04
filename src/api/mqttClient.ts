@@ -29,14 +29,89 @@ import {
   MQTT_KEEPALIVE_SECONDS,
   AWS_SIGNATURE_EXPIRY_SECONDS,
   DEBUG_LOG_PREVIEW_LENGTH,
+  SHADOW_RATE_LIMIT_CODE,
+  SHADOW_MIN_REQUEST_INTERVAL_MS,
+  SHADOW_RETRY_MAX_ATTEMPTS,
+  SHADOW_RETRY_BASE_DELAY_MS,
+  SHADOW_RETRY_MAX_DELAY_MS,
+  SHADOW_RETRY_JITTER_MS,
+  SHADOW_THROTTLE_LOG_INTERVAL_MS,
+  SHADOW_COMMAND_RETRY_MAX_ATTEMPTS,
+  SHADOW_COMMAND_RETRY_BASE_DELAY_MS,
 } from '../config/constants.js';
 import { MQTTError, ErrorCode } from '../utils/errors.js';
+import { unrefTimer } from '../utils/timers.js';
 
 export interface MQTTClientConfig {
   serialNumber: string;
   region: string;
   iotEndpoint: string;
   credentials: AWSIoTCredentials;
+}
+
+/**
+ * Error payload published by AWS IoT on the shadow `rejected` topics
+ */
+interface ShadowRejection {
+  code?: number;
+  message?: string;
+}
+
+/**
+ * Outcome of a single shadow request
+ */
+type ShadowResponse =
+  | { accepted: true; shadow: RawShadowState }
+  | { accepted: false; error: ShadowRejection };
+
+/**
+ * A shadow request awaiting its response
+ */
+interface PendingShadowRequest {
+  resolve: (response: ShadowResponse) => void;
+  reject: (error: unknown) => void;
+  timeout: ReturnType<typeof setTimeout>;
+  // A `get` only asks for the current document, so an untagged shadow push
+  // answers it just as well; an update must see its own response
+  acceptsUntaggedResponse: boolean;
+}
+
+/**
+ * How hard to retry a throttled shadow operation
+ */
+interface ShadowRetryPolicy {
+  attempts: number;
+  baseDelayMs: number;
+}
+
+const POLL_RETRY_POLICY: ShadowRetryPolicy = {
+  attempts: SHADOW_RETRY_MAX_ATTEMPTS,
+  baseDelayMs: SHADOW_RETRY_BASE_DELAY_MS,
+};
+
+const COMMAND_RETRY_POLICY: ShadowRetryPolicy = {
+  attempts: SHADOW_COMMAND_RETRY_MAX_ATTEMPTS,
+  baseDelayMs: SHADOW_COMMAND_RETRY_BASE_DELAY_MS,
+};
+
+const delay = (ms: number): Promise<void> =>
+  new Promise((resolve) => {
+    unrefTimer(setTimeout(resolve, ms));
+  });
+
+/**
+ * Whether a shadow rejection is an AWS IoT throttling response
+ */
+function isRateLimited(rejection: ShadowRejection | undefined): boolean {
+  return rejection?.code === SHADOW_RATE_LIMIT_CODE || rejection?.message === 'TOO_MANY_REQUESTS';
+}
+
+/**
+ * Exponential backoff with jitter, so retries from several clients spread out
+ */
+function backoffDelay(attempt: number, policy: ShadowRetryPolicy): number {
+  const base = Math.min(policy.baseDelayMs * 2 ** (attempt - 1), SHADOW_RETRY_MAX_DELAY_MS);
+  return base + Math.floor(Math.random() * SHADOW_RETRY_JITTER_MS);
 }
 
 /**
@@ -54,6 +129,15 @@ export class MQTTClient extends EventEmitter {
   private reconnectAttempts = 0;
   private readonly maxReconnectAttempts = 5;
   private currentShadow: RawShadowState | null = null;
+  private lastShadowReceivedAt = 0;
+  // Shadow request pacing / throttle bookkeeping
+  private readonly pendingRequests = new Map<string, PendingShadowRequest>();
+  private requestCounter = 0;
+  private requestGate: Promise<void> = Promise.resolve();
+  private lastRequestAt = 0;
+  private pendingGet: Promise<RawShadowState> | undefined;
+  private throttledRequests = 0;
+  private lastThrottleLogAt = 0;
 
   constructor(config: MQTTClientConfig, log: Logger) {
     super();
@@ -259,18 +343,57 @@ export class MQTTClient extends EventEmitter {
       const message = JSON.parse(payload.toString());
       this.log.debug(`MQTT message on ${topic}:`, JSON.stringify(message).substring(0, DEBUG_LOG_PREVIEW_LENGTH));
 
+      // AWS IoT echoes the clientToken we sent, which lets concurrent shadow
+      // operations tell their own response apart from someone else's
+      const clientToken = typeof message?.clientToken === 'string' ? message.clientToken : undefined;
+
       if (topic.includes('/shadow/get/accepted') || topic.includes('/shadow/update/accepted')) {
         this.currentShadow = message as RawShadowState;
+        this.lastShadowReceivedAt = Date.now();
         this.emit('shadowUpdate', this.currentShadow);
+        this.settlePendingRequest(clientToken, { accepted: true, shadow: this.currentShadow });
       } else if (topic.includes('/shadow/get/rejected') || topic.includes('/shadow/update/rejected')) {
-        this.log.warn('Shadow operation rejected:', message);
+        this.logShadowRejection(message as ShadowRejection);
         this.emit('shadowRejected', message);
+        this.settlePendingRequest(clientToken, { accepted: false, error: message as ShadowRejection });
       } else if (topic.includes('Maytronics/') && topic.includes('/main')) {
         this.emit('dynamicMessage', message);
       }
     } catch (error) {
       this.log.debug('Failed to parse MQTT message:', error);
     }
+  }
+
+  /**
+   * Log a shadow rejection. Throttling (429) is expected on the shared MyDolphin
+   * AWS account and is retried transparently, so it is only counted here and
+   * surfaced by reportThrottling() once retries are exhausted.
+   */
+  private logShadowRejection(rejection: ShadowRejection): void {
+    if (isRateLimited(rejection)) {
+      this.throttledRequests++;
+      this.log.debug('Shadow operation throttled by AWS IoT (429 TOO_MANY_REQUESTS), will retry');
+      return;
+    }
+    this.log.warn('Shadow operation rejected:', rejection);
+  }
+
+  /**
+   * Surface persistent throttling at most once per SHADOW_THROTTLE_LOG_INTERVAL_MS
+   */
+  private reportThrottling(operation: string, attempts: number): void {
+    const now = Date.now();
+    if (now - this.lastThrottleLogAt < SHADOW_THROTTLE_LOG_INTERVAL_MS) {
+      this.log.debug(`${operation} gave up after ${attempts} throttled attempts`);
+      return;
+    }
+    this.log.warn(
+      `${operation} throttled by AWS IoT after ${attempts} attempts ` +
+        `(${this.throttledRequests} throttled request(s) so far). ` +
+        'This is a temporary MyDolphin cloud limit; state will refresh on the next poll.',
+    );
+    this.lastThrottleLogAt = now;
+    this.throttledRequests = 0;
   }
 
   /**
@@ -283,91 +406,174 @@ export class MQTTClient extends EventEmitter {
   }
 
   /**
-   * Wait for a shadow response (update accepted or rejected) with timeout.
-   * Shared logic for getShadow and updateShadow.
+   * Wait for the response to a single shadow request, correlated by clientToken.
+   * Resolves with the accepted shadow or the rejection payload; rejects on timeout.
    */
-  private waitForShadowResponse<T>(
-    onSuccess: (resolve: (value: T) => void) => (...args: unknown[]) => void,
-    onFailure: (resolve: (value: T) => void, reject: (reason: unknown) => void) => (...args: unknown[]) => void,
-    publish: () => void,
-  ): Promise<T> {
-    return new Promise<T>((resolve, reject) => {
-      let settled = false;
-      // eslint-disable-next-line prefer-const -- forward-declared for mutual reference with timeout
-      let updateHandler: (...args: unknown[]) => void;
-      // eslint-disable-next-line prefer-const -- forward-declared for mutual reference with timeout
-      let rejectedHandler: (...args: unknown[]) => void;
-      // eslint-disable-next-line prefer-const -- forward-declared for mutual reference with handlers
-      let timeout: ReturnType<typeof setTimeout>;
+  private waitForShadowResponse(
+    publish: (clientToken: string) => void,
+    acceptsUntaggedResponse: boolean,
+  ): Promise<ShadowResponse> {
+    const clientToken = this.nextClientToken();
 
-      const settle = <V>(cb: (value: V) => void, value: V) => {
-        if (!settled) {
-          settled = true;
-          clearTimeout(timeout);
-          this.removeListener('shadowUpdate', updateHandler);
-          this.removeListener('shadowRejected', rejectedHandler);
-          cb(value);
-        }
-      };
+    return new Promise<ShadowResponse>((resolve, reject) => {
+      const timeout = unrefTimer(setTimeout(() => {
+        this.pendingRequests.delete(clientToken);
+        reject(new MQTTError(ErrorCode.MQTT_SHADOW_TIMEOUT, 'Shadow operation timeout'));
+      }, SHADOW_TIMEOUT_MS));
 
-      timeout = setTimeout(() => {
-        settle(reject, new MQTTError(ErrorCode.MQTT_SHADOW_TIMEOUT, 'Shadow operation timeout'));
-      }, SHADOW_TIMEOUT_MS);
-
-      updateHandler = onSuccess((value: T) => settle(resolve, value));
-      rejectedHandler = onFailure(
-        (value: T) => settle(resolve, value),
-        (reason: unknown) => settle(reject, reason),
-      );
-
-      this.once('shadowUpdate', updateHandler);
-      this.once('shadowRejected', rejectedHandler);
-
-      publish();
+      this.pendingRequests.set(clientToken, { resolve, reject, timeout, acceptsUntaggedResponse });
+      publish(clientToken);
     });
   }
 
   /**
-   * Request current shadow state
+   * Hand a shadow response to the request that asked for it.
+   *
+   * AWS IoT echoes our clientToken, so a matching token settles that request and
+   * a foreign one (the phone app talking to the same robot) settles nothing.
+   * `update/accepted` is also broadcast without a token when the robot reports
+   * its own state: that document answers a pending `get`, but must never be read
+   * as acceptance of our update, and an untagged rejection is attributed to nobody.
+   */
+  private settlePendingRequest(clientToken: string | undefined, response: ShadowResponse): void {
+    const key = clientToken ?? this.findUntaggedRecipient(response);
+    const pending = key === undefined ? undefined : this.pendingRequests.get(key);
+    if (key === undefined || !pending) {
+      return;
+    }
+
+    this.pendingRequests.delete(key);
+    clearTimeout(pending.timeout);
+    pending.resolve(response);
+  }
+
+  /**
+   * Token of the request an untagged response may settle, if any
+   */
+  private findUntaggedRecipient(response: ShadowResponse): string | undefined {
+    if (!response.accepted) {
+      return undefined;
+    }
+
+    for (const [clientToken, pending] of this.pendingRequests) {
+      if (pending.acceptsUntaggedResponse) {
+        return clientToken;
+      }
+    }
+    return undefined;
+  }
+
+  /**
+   * Unique token used to match a shadow response to its request
+   */
+  private nextClientToken(): string {
+    this.requestCounter = (this.requestCounter + 1) % Number.MAX_SAFE_INTEGER;
+    return `${this.truncatedSerial}-${this.requestCounter}`;
+  }
+
+  /**
+   * Serialize shadow publishes and keep a minimum gap between them so bursts
+   * (e.g. set mode + start + refresh) do not trip the AWS IoT throttle
+   */
+  private awaitRequestSlot(): Promise<void> {
+    const slot = this.requestGate.then(async () => {
+      const wait = this.lastRequestAt + SHADOW_MIN_REQUEST_INTERVAL_MS - Date.now();
+      if (wait > 0) {
+        await delay(wait);
+      }
+      this.lastRequestAt = Date.now();
+    });
+    this.requestGate = slot.catch(() => undefined);
+    return slot;
+  }
+
+  /**
+   * Publish a shadow request, retrying with exponential backoff while AWS IoT
+   * answers with 429 TOO_MANY_REQUESTS
+   */
+  private async requestShadow(
+    operation: string,
+    policy: ShadowRetryPolicy,
+    acceptsUntaggedResponse: boolean,
+    publish: (clientToken: string) => void,
+  ): Promise<ShadowResponse> {
+    let lastError: ShadowRejection = { code: SHADOW_RATE_LIMIT_CODE, message: 'TOO_MANY_REQUESTS' };
+
+    for (let attempt = 1; attempt <= policy.attempts; attempt++) {
+      await this.awaitRequestSlot();
+      this.ensureConnected();
+
+      const response = await this.waitForShadowResponse(publish, acceptsUntaggedResponse);
+      if (response.accepted || !isRateLimited(response.error)) {
+        return response;
+      }
+
+      lastError = response.error;
+      if (attempt < policy.attempts) {
+        const backoff = backoffDelay(attempt, policy);
+        this.log.debug(
+          `${operation} throttled, retrying in ${backoff}ms (attempt ${attempt}/${policy.attempts})`,
+        );
+        await delay(backoff);
+      }
+    }
+
+    this.reportThrottling(operation, policy.attempts);
+    return { accepted: false, error: lastError };
+  }
+
+  /**
+   * Request current shadow state.
+   * Concurrent callers share a single in-flight request.
    */
   async getShadow(): Promise<RawShadowState> {
     this.ensureConnected();
 
-    return this.waitForShadowResponse<RawShadowState>(
-      (resolve) => (shadow: unknown) => resolve(shadow as RawShadowState),
-      (_resolve, reject) => (error: unknown) => {
-        reject(new MQTTError(
-          ErrorCode.MQTT_SHADOW_REJECTED,
-          `Shadow request rejected: ${JSON.stringify(error)}`,
-        ));
-      },
-      () => {
-        const topic = `$aws/things/${this.truncatedSerial}/shadow/get`;
-        this.client!.publish(topic, '', { qos: 1 });
-        this.log.debug(`Requested shadow on ${topic}`);
-      },
-    );
+    if (this.pendingGet) {
+      this.log.debug('Reusing in-flight shadow request');
+      return this.pendingGet;
+    }
+
+    const topic = `$aws/things/${this.truncatedSerial}/shadow/get`;
+    this.pendingGet = this.requestShadow('Shadow request', POLL_RETRY_POLICY, true, (clientToken) => {
+      this.client!.publish(topic, JSON.stringify({ clientToken }), { qos: 1 });
+      this.log.debug(`Requested shadow on ${topic}`);
+    })
+      .then((response) => {
+        if (response.accepted) {
+          return response.shadow;
+        }
+        throw new MQTTError(
+          isRateLimited(response.error) ? ErrorCode.MQTT_SHADOW_RATE_LIMITED : ErrorCode.MQTT_SHADOW_REJECTED,
+          `Shadow request rejected: ${JSON.stringify(response.error)}`,
+        );
+      })
+      .finally(() => {
+        this.pendingGet = undefined;
+      });
+
+    return this.pendingGet;
   }
 
   /**
-   * Update shadow with desired state
+   * Update shadow with desired state.
+   * Retries are kept short because HomeKit is waiting on the result.
    */
   async updateShadow(desired: Record<string, unknown>): Promise<boolean> {
     this.ensureConnected();
 
-    return this.waitForShadowResponse<boolean>(
-      (resolve) => () => resolve(true),
-      (resolve) => (error: unknown) => {
-        this.log.error('Shadow update rejected:', error);
-        resolve(false);
-      },
-      () => {
-        const payload = JSON.stringify({ state: { desired } });
-        const topic = `$aws/things/${this.truncatedSerial}/shadow/update`;
-        this.client!.publish(topic, payload, { qos: 1 });
-        this.log.debug(`Published shadow update on ${topic}:`, payload.substring(0, DEBUG_LOG_PREVIEW_LENGTH));
-      },
-    );
+    const topic = `$aws/things/${this.truncatedSerial}/shadow/update`;
+    const response = await this.requestShadow('Shadow update', COMMAND_RETRY_POLICY, false, (clientToken) => {
+      const payload = JSON.stringify({ state: { desired }, clientToken });
+      this.client!.publish(topic, payload, { qos: 1 });
+      this.log.debug(`Published shadow update on ${topic}:`, payload.substring(0, DEBUG_LOG_PREVIEW_LENGTH));
+    });
+
+    if (!response.accepted && !isRateLimited(response.error)) {
+      this.log.error('Shadow update rejected:', response.error);
+    }
+
+    return response.accepted;
   }
 
   /**
@@ -443,6 +649,16 @@ export class MQTTClient extends EventEmitter {
       this.client = undefined;
     }
     this.connected = false;
+
+    // In-flight requests can no longer be answered; fail them now instead of
+    // waiting for their timeouts
+    for (const [clientToken, pending] of this.pendingRequests) {
+      this.pendingRequests.delete(clientToken);
+      clearTimeout(pending.timeout);
+      pending.reject(
+        new MQTTError(ErrorCode.MQTT_NOT_CONNECTED, 'MQTT disconnected while waiting for a shadow response'),
+      );
+    }
   }
 
   /**
@@ -457,5 +673,12 @@ export class MQTTClient extends EventEmitter {
    */
   getCurrentShadow(): RawShadowState | null {
     return this.currentShadow;
+  }
+
+  /**
+   * Timestamp of the last shadow document received (0 if none yet)
+   */
+  getLastShadowReceivedAt(): number {
+    return this.lastShadowReceivedAt;
   }
 }

@@ -389,3 +389,60 @@ describe('DolphinAccessory - Multiple Devices', () => {
     expect(device2.getState().isCleaning).toBe(false);
   });
 });
+
+describe('DolphinAccessory - command results', () => {
+  let mockLogger: ReturnType<typeof createMockLogger>;
+  let mockAccessory: ReturnType<typeof createMockPlatformAccessory>;
+
+  const createDevice = (overrides: Record<string, unknown>) =>
+    Object.assign(new EventEmitter(), {
+      serialNumber: 'E3086OFG2M',
+      name: 'Dolphin M400',
+      modelName: 'Dolphin M400',
+      features: { hasTemperatureSensor: true },
+      getState: vi.fn(() => ({ isCleaning: false, temperature: 20, filterStatus: 'ok' })),
+      startCleaning: vi.fn().mockResolvedValue(true),
+      stopCleaning: vi.fn().mockResolvedValue(true),
+      ...overrides,
+    });
+
+  const createAccessory = async (device: unknown) => {
+    const { DolphinAccessory } = await import('../../src/accessories/dolphinAccessory.js');
+    const platform = {
+      // Valve is only looked up to migrate away from it
+      Service: { ...MockServices, Valve: { name: 'Valve', UUID: 'mock-service-uuid-Valve' } },
+      Characteristic: { ...MockCharacteristics, ConfiguredName: { name: 'ConfiguredName', UUID: 'mock-uuid-ConfiguredName' } },
+      log: mockLogger,
+    };
+    return new DolphinAccessory(platform as never, mockAccessory, device as never, undefined);
+  };
+
+  const switchOn = () =>
+    mockAccessory.getService(MockServices.Switch as never)!.getCharacteristic(MockCharacteristics.On as never);
+
+  beforeEach(() => {
+    mockLogger = createMockLogger();
+    mockAccessory = createMockPlatformAccessory('Dolphin M400', 'test-uuid-123');
+  });
+
+  it('should revert the switch when the cloud does not accept the command', async () => {
+    const device = createDevice({ startCleaning: vi.fn().mockResolvedValue(false) });
+    const accessory = await createAccessory(device);
+
+    await (accessory as any).setOn(true);
+
+    expect(device.startCleaning).toHaveBeenCalled();
+    expect(switchOn().value).toBe(false);
+    expect(mockLogger.warn).toHaveBeenCalledWith(expect.stringContaining('did not accept the start command'));
+  });
+
+  it('should leave the switch on when the command is accepted', async () => {
+    const device = createDevice({});
+    const accessory = await createAccessory(device);
+
+    await (accessory as any).setOn(true);
+
+    expect(switchOn().value).toBe(true);
+    expect(mockLogger.warn).not.toHaveBeenCalled();
+  });
+});

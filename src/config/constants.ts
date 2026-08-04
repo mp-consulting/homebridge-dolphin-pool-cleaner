@@ -72,6 +72,23 @@ export const MIN_POLLING_INTERVAL = 30; // seconds
 export const SHADOW_TIMEOUT_MS = 10000; // 10 seconds for shadow operations
 export const API_TIMEOUT_MS = 15000; // 15 seconds for API calls
 
+// AWS IoT shadow rate limiting
+// The MyDolphin AWS account is shared by all users, so shadow operations can be
+// throttled (429 TOO_MANY_REQUESTS) at any time. Requests are spaced out, retried
+// with exponential backoff, and only reported once the retries are exhausted.
+export const SHADOW_RATE_LIMIT_CODE = 429;
+export const SHADOW_MIN_REQUEST_INTERVAL_MS = 1000; // minimum gap between shadow publishes
+export const SHADOW_RETRY_MAX_ATTEMPTS = 3;
+export const SHADOW_RETRY_BASE_DELAY_MS = 2000; // first backoff, doubled per attempt
+export const SHADOW_RETRY_MAX_DELAY_MS = 15000;
+export const SHADOW_RETRY_JITTER_MS = 500;
+export const SHADOW_THROTTLE_LOG_INTERVAL_MS = 10 * 60 * 1000; // at most one throttle warning per 10 minutes
+
+// Commands are awaited by HomeKit, which gives up on a slow write and shows
+// "No Response", so they retry fewer times and back off faster than polling
+export const SHADOW_COMMAND_RETRY_MAX_ATTEMPTS = 2;
+export const SHADOW_COMMAND_RETRY_BASE_DELAY_MS = 750;
+
 // Serial number
 export const SERIAL_NUMBER_LENGTH = 8; // Truncated serial for AWS IoT
 

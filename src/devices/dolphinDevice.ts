@@ -19,6 +19,7 @@ import {
   type ParsedRobotState,
   type RawShadowState,
 } from '../parsers/index.js';
+import { unrefTimer } from '../utils/timers.js';
 import type { MaytronicsAPI } from '../api/maytronicsApi.js';
 import type { Logger } from 'homebridge';
 
@@ -78,13 +79,16 @@ export class DolphinDevice extends EventEmitter {
       `Starting polling for ${this.name} every ${this.pollingInterval}s`,
     );
 
+    // Shadow documents pushed over MQTT keep the state fresh without polling
+    this.api.on('shadowUpdate', this.handlePushedShadow);
+
     // Initial state fetch
     await this.refreshState();
 
     // Start polling
-    this.pollingTimer = setInterval(async () => {
-      await this.refreshState();
-    }, this.pollingInterval * MILLISECONDS_PER_SECOND);
+    this.pollingTimer = unrefTimer(setInterval(() => {
+      void this.poll();
+    }, this.pollingInterval * MILLISECONDS_PER_SECOND));
   }
 
   /**
@@ -95,8 +99,34 @@ export class DolphinDevice extends EventEmitter {
       clearInterval(this.pollingTimer);
       this.pollingTimer = undefined;
     }
+    this.api.removeListener('shadowUpdate', this.handlePushedShadow);
     this.log.debug(`Stopped polling for ${this.name}`);
   }
+
+  /**
+   * Poll the shadow, unless MQTT already pushed a recent one.
+   * Skipping redundant requests keeps us under the AWS IoT shadow rate limit.
+   */
+  private async poll(): Promise<void> {
+    const sincePush = Date.now() - this.api.getLastShadowReceivedAt();
+    if (sincePush < this.pollingInterval * MILLISECONDS_PER_SECOND) {
+      this.log.debug(
+        `Skipping poll for ${this.name}: shadow received ${Math.round(sincePush / MILLISECONDS_PER_SECOND)}s ago`,
+      );
+      return;
+    }
+    await this.refreshState();
+  }
+
+  /**
+   * Handle a shadow document pushed over MQTT (robot-initiated update)
+   */
+  private readonly handlePushedShadow = (shadow: RawShadowState): void => {
+    this.state.connected = true;
+    if (this.processShadowState(shadow)) {
+      this.emit('stateChange', this.state);
+    }
+  };
 
   /**
    * Get current device state
@@ -126,13 +156,14 @@ export class DolphinDevice extends EventEmitter {
   }
 
   /**
-   * Process Thing Shadow state into RobotState
+   * Process Thing Shadow state into RobotState.
+   * Returns false when the shadow carries no change.
    */
-  private processShadowState(shadow: RawShadowState): void {
+  private processShadowState(shadow: RawShadowState): boolean {
     // Check if shadow has been updated
     const version = getShadowVersion(shadow);
     if (version !== undefined && version === this.lastShadowVersion) {
-      return; // No changes
+      return false; // No changes
     }
     this.lastShadowVersion = version;
 
@@ -150,6 +181,8 @@ export class DolphinDevice extends EventEmitter {
     this.log.debug(
       `State updated for ${this.name}: cleaning=${this.state.isCleaning}, mode=${this.state.cleaningMode}`,
     );
+
+    return true;
   }
 
   /**
@@ -177,7 +210,7 @@ export class DolphinDevice extends EventEmitter {
       this.emit('stateChange', this.state);
 
       // Refresh state after a short delay
-      setTimeout(() => this.refreshState(), STATE_REFRESH_DELAY_MS);
+      unrefTimer(setTimeout(() => void this.refreshState(), STATE_REFRESH_DELAY_MS));
     }
 
     return success;
@@ -198,7 +231,7 @@ export class DolphinDevice extends EventEmitter {
       this.emit('stateChange', this.state);
 
       // Refresh state after a short delay
-      setTimeout(() => this.refreshState(), STATE_REFRESH_DELAY_MS);
+      unrefTimer(setTimeout(() => void this.refreshState(), STATE_REFRESH_DELAY_MS));
     }
 
     return success;
@@ -237,7 +270,7 @@ export class DolphinDevice extends EventEmitter {
       this.emit('stateChange', this.state);
 
       // Refresh state after a short delay
-      setTimeout(() => this.refreshState(), STATE_REFRESH_DELAY_MS);
+      unrefTimer(setTimeout(() => void this.refreshState(), STATE_REFRESH_DELAY_MS));
     }
 
     return success;
