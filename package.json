@@ -1,7 +1,7 @@
 {
   "name": "@mp-consulting/homebridge-dolphin-pool-cleaner",
   "displayName": "Dolphin Pool Cleaner",
-  "version": "1.0.22",
+  "version": "1.0.23",
   "description": "Homebridge plugin for MyDolphin Plus pool cleaning robots (Maytronics)",
   "type": "module",
   "main": "dist/index.js",
@@ -38,7 +38,7 @@
   "author": "MP Consulting",
   "license": "MIT",
   "engines": {
-    "node": "^20.18.0 || ^22.10.0 || ^24.0.0",
+    "node": "^22.10.0 || ^24.0.0 || ^26.0.0",
     "homebridge": "^1.8.0 || ^2.0.0-beta.0"
   },
   "repository": {
