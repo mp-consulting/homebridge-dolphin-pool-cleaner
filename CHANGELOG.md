@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.24] - 2026-08-10
+
+### Fixed
+
+- **The Homebridge log showed `[DolphinPoolCleaner]` instead of `[Dolphin Pool Cleaner]`**: Homebridge derives a plugin's log prefix from `name` in its platform config, falling back to the plugin alias when that key is absent. `config.schema.json` declared a `name` property but never listed it in `layout`, so the settings form never rendered the field and never wrote its default into `config.json`. `name` is now the first control in the form and defaults to `Dolphin Pool Cleaner`.
+
 ## [1.0.23] - 2026-08-09
 
 ### Changed
