@@ -100,6 +100,7 @@
     }
   },
   "layout": [
+    "name",
     {
       "type": "fieldset",
       "title": "Account Settings",
