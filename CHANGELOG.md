@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.25] - 2026-09-10
+
+### Changed
+
+- **Dependencies**: Updated all dependencies to latest compatible versions, including `@aws-sdk/client-cognito-identity-provider` and `@aws-sdk/client-iot` ^3.1127.0, `axios` ^1.20.0 and `mqtt` ^5.15.2, plus dev-only major bumps for `vitest` (4→5) and `@types/node` (25→26).
+
 ## [1.0.24] - 2026-08-10
 
 ### Fixed
