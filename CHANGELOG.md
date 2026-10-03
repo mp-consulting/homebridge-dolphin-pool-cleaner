@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.26] - 2026-10-03
+
+### Fixed
+
+- **The default cleaning mode was never sent**: the settings form and setup wizard saved `regular`, which the plugin did not recognise, so the robot kept whatever mode it last ran. `regular` is now treated as `all`, and the form and wizard offer `all`.
+- **"Filter needs cleaning" cleared itself**: a partial shadow push without filter data (a temperature update, for example) reset the filter indicator to OK. The last known status is now kept.
+- **The plugin could stop responding until Homebridge restarted**:
+  - Connecting to AWS IoT could wait forever when the broker rejected the handshake. Connecting now times out.
+  - Concurrent requests near credential expiry could log in twice and open two MQTT connections with the same client ID. They now share one attempt.
+  - Automatic MQTT reconnects reused a URL signed with expired credentials. Each attempt is now signed with the current credentials.
+- **The HomeKit accessory could be removed after a network glitch**: if the robot details request failed at startup, the robot was treated as gone and its accessory (with your automations) was unregistered.
+- **Startup failures are retried**: if the cloud is unreachable at launch, discovery retries with backoff (30s up to 10 min) instead of giving up. Rejected credentials are not retried.
+- **Clean shutdown**: polling stops and MQTT disconnects when Homebridge shuts down.
+- **Water temperature**: shows the last known reading (kept across restarts) instead of a made-up 20 °C, and reports an error until a first reading exists.
+
+### Changed
+
+- **Setup wizard on phones**: the configured-robot cards now stack the image above the details, so serial numbers, the account email and the cleaning mode are no longer truncated. Buttons, inputs and checkbox rows are at least 44px tall, and action buttons stack full width with the primary action first. The robot card can be opened from the keyboard, and shows an "Edit settings" hint.
+- **Faster starts**: the set-mode request is skipped when the robot already has that mode queued for its next cycle.
+- **Setup wizard**: the UI server no longer sends ID or access tokens to the browser, and the unused `/test-connection` and `/get-robots` endpoints (which each sent a login code) were removed. Email and password are no longer required in the settings form, because the wizard stores a refresh token instead.
+- **Dependencies**: removed `axios` (replaced by native `fetch`), `@aws-sdk/client-iot` and the unused `class-validator`. A high-severity advisory in a transitive dependency (`ip-address`) is fixed.
+- **CI**: actions pinned to commit SHAs. The publish job pins npm 11, and both workflows run lint and tests with coverage thresholds.
+
 ## [1.0.25] - 2026-09-10
 
 ### Changed
