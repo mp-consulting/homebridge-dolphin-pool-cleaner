@@ -81,6 +81,10 @@
     return mode === 'regular' ? 'all' : mode;
   }
 
+  const CHEVRON_RIGHT_SVG = '<svg class="bi" width="1em" height="1em" viewBox="0 0 16 16">'
+    + '<path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708"/>'
+    + '</svg>';
+
   const ROBOT_SVG = `<svg viewBox="0 0 200 160" xmlns="http://www.w3.org/2000/svg">
     <defs>
       <linearGradient id="bodyGradient" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -663,10 +667,15 @@
   function createRobotCard(device, email, deviceIndex) {
     const card = document.createElement('div');
     card.className = 'robot-card robot-card-clickable';
+    // Behaves as a button: reachable by keyboard and announced by screen readers
+    card.setAttribute('role', 'button');
+    card.tabIndex = 0;
+    card.setAttribute('aria-label', `Edit ${device.name || 'Dolphin Robot'}`);
 
     const safeName = escapeHtml(device.name || 'Dolphin Robot');
     const safeSerial = escapeHtml(device.serialNumber || '-');
-    const safeEmail = escapeHtml(email || '-');
+    // Allow a line break after the @ so a long email wraps at a natural point on phones
+    const safeEmail = escapeHtml(email || '-').replace('@', '@<wbr>');
     const safeImageUrl = sanitizeUrl(device.robotImageUrl);
 
     const imageHtml = safeImageUrl
@@ -703,10 +712,20 @@
             <span class="detail-value">${escapeHtml(getCleaningModeText(device.cleaningMode))}</span>
           </div>
         </div>
+        <div class="robot-card-edit-hint" aria-hidden="true">
+          Edit settings
+          ${CHEVRON_RIGHT_SVG}
+        </div>
       </div>
     `;
 
     card.addEventListener('click', () => editDevice(deviceIndex));
+    card.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        editDevice(deviceIndex);
+      }
+    });
 
     return card;
   }
