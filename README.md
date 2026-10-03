@@ -234,7 +234,6 @@ src/
 ├── devices/          # Robot device representation
 ├── accessories/      # HomeKit accessory implementation
 ├── parsers/          # Shadow state parsing
-├── protocol/         # BLE command building
 ├── config/           # Constants and configuration
 └── utils/            # Error handling utilities
 ```

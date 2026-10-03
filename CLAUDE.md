@@ -14,7 +14,7 @@ Homebridge plugin (`@mp-consulting/homebridge-dolphin-pool-cleaner`) for Maytron
 
 ## Commands
 
-- `npm run build` — Compile TypeScript and copy assets to `dist/`
+- `npm run build` — Copy the UI kit assets and compile TypeScript to `dist/`
 - `npm run lint` — Lint with zero warnings
 - `npm test` — Run tests (Vitest)
 - `npm run test:coverage` — Tests with coverage (thresholds enforced; CI runs this)
@@ -31,7 +31,6 @@ src/
 │   └── auth/                   # AWS Cognito authentication
 ├── devices/                    # Device abstraction + catalog
 ├── parsers/                    # AWS Shadow state, filter status, fault codes
-├── protocol/                   # IoT command builder + BLE command definitions
 ├── config/                     # Constants and defaults
 └── utils/                      # Error utilities
 test/
@@ -51,7 +50,6 @@ homebridge-ui/                  # Custom setup wizard UI
 - **Shutdown**: devices stop polling and MQTT disconnects on Homebridge `shutdown`
 - **Single-flight** login and MQTT connect: concurrent callers share one attempt (AWS IoT drops duplicate client IDs)
 - **Parser layer** decodes AWS Shadow state into device properties
-- **Command builder** constructs IoT commands from BLE command protocol definitions
 - **Custom UI**: Uses Homebridge custom UI framework (`homebridge-ui/`) for plugin configuration management
 
 ## Code Style
