@@ -11,7 +11,6 @@ export const MAYTRONICS_API = {
 };
 // AWS Cognito Configuration
 export const COGNITO = {
-  USER_POOL_ID: 'us-west-2_PKsEdCoP5',
   CLIENT_ID: '4ed12eq01o6n0tl5f0sqmkq2na',
   REGION: 'us-west-2',
 };
@@ -22,8 +21,6 @@ export const IOT_ENDPOINTS: Record<string, string> = {
   'eu-central-1': 'a2tgkimxdrkpxm-ats.iot.eu-central-1.amazonaws.com', // Test
   'us-east-2': 'awqf0dif0s78s-ats.iot.us-east-2.amazonaws.com', // Development
 };
-// Default IoT endpoint (production) - eu-west-1 per iOS app config
-export const DEFAULT_IOT_ENDPOINT = IOT_ENDPOINTS['eu-west-1'];
 export const DEFAULT_IOT_REGION = 'eu-west-1';
 // Cleaning modes with their duration in minutes
 // The 'apiMode' field is the string value expected by the shadow update API
@@ -104,6 +101,10 @@ export const MQTT_KEEPALIVE_SECONDS = 30;
 export const MILLISECONDS_PER_SECOND = 1000;
 export const SECONDS_PER_MINUTE = 60;
 export const DEFAULT_CYCLE_TIME_MINUTES = 120;
+
+// Discovery retry backoff when the cloud is unreachable at startup
+export const DISCOVERY_RETRY_BASE_DELAY_MS = 30_000;
+export const DISCOVERY_RETRY_MAX_DELAY_MS = 10 * 60 * 1000;
 
 // State refresh delay after commands
 export const STATE_REFRESH_DELAY_MS = 3000;

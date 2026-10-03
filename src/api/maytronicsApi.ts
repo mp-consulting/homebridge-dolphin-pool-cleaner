@@ -8,7 +8,7 @@ import { EventEmitter } from 'events';
 import type { Logger } from 'homebridge';
 import { MQTTClient } from './mqttClient.js';
 import { AuthenticationManager } from './auth/authenticationManager.js';
-import type { AWSIoTCredentials, AuthConfig } from './auth/types.js';
+import type { AuthConfig, LoginResult as AuthLoginResult } from './auth/types.js';
 import type { RawShadowState } from '../parsers/types.js';
 import { ApiError, ErrorCode, PluginError, getErrorMessage } from '../utils/errors.js';
 
@@ -33,27 +33,20 @@ export interface RobotInfo {
 }
 
 /**
- * Thing Shadow command structure
+ * Login result exposed to callers (connection details stay internal)
  */
-export interface ThingShadowCommand {
-  state: {
-    desired: Record<string, unknown>;
-  };
+export type LoginResult = Omit<AuthLoginResult, 'awsCredentials' | 'iotEndpoint'>;
+
+interface RobotDetailsData {
+  SERNUM?: string;
+  MyRobotName?: string;
+  PARTDES?: string;
+  warranty_days?: number;
 }
 
-/**
- * Login result
- */
-export interface LoginResult {
-  cognitoToken: string;
-  mobToken: string;
-  serialNumber: string;
-  robotName: string;
-  deviceType: number;
+interface RobotFeaturesData {
+  features?: { description: string }[];
 }
-
-// Re-export for backward compatibility
-export type { AWSIoTCredentials as AWSCredentials };
 
 /**
  * Maytronics API Client
@@ -66,6 +59,7 @@ export class MaytronicsAPI extends EventEmitter {
   private readonly log: Logger;
   private readonly authManager: AuthenticationManager;
   private mqttClient: MQTTClient | undefined;
+  private pendingMqttConnect?: Promise<void>;
   private hasLoggedMqttConnection = false;
 
   constructor(
@@ -92,28 +86,31 @@ export class MaytronicsAPI extends EventEmitter {
    * Complete authentication flow
    */
   async login(): Promise<LoginResult> {
-    const result = await this.authManager.login();
+    const { cognitoToken, mobToken, serialNumber, robotName, deviceType } = await this.authManager.login();
 
     // Initialize MQTT client after authentication
-    await this.initializeMQTTClient(result.awsCredentials, result.iotEndpoint);
+    await this.connectMQTT();
 
-    return {
-      cognitoToken: result.cognitoToken,
-      mobToken: result.mobToken,
-      serialNumber: result.serialNumber,
-      robotName: result.robotName,
-      deviceType: result.deviceType,
-    };
+    return { cognitoToken, mobToken, serialNumber, robotName, deviceType };
+  }
+
+  /**
+   * Open the MQTT connection. Concurrent callers share one attempt, so two
+   * clients never connect with the same client ID (AWS IoT would drop one).
+   */
+  private connectMQTT(): Promise<void> {
+    this.pendingMqttConnect ??= this.initializeMQTTClient().finally(() => {
+      this.pendingMqttConnect = undefined;
+    });
+    return this.pendingMqttConnect;
   }
 
   /**
    * Initialize MQTT client and connect to AWS IoT Core
    */
-  private async initializeMQTTClient(
-    credentials: AWSIoTCredentials,
-    iotEndpoint: string,
-  ): Promise<void> {
-    const serialNumber = this.authManager.getCredentialManager().getSerialNumber();
+  private async initializeMQTTClient(): Promise<void> {
+    const credentialManager = this.authManager.getCredentialManager();
+    const serialNumber = credentialManager.getSerialNumber();
     if (!serialNumber) {
       throw new ApiError(ErrorCode.API_REQUEST_FAILED, 'Serial number not available');
     }
@@ -127,8 +124,8 @@ export class MaytronicsAPI extends EventEmitter {
       {
         serialNumber,
         region: this.authManager.getIoTRegion(),
-        iotEndpoint,
-        credentials,
+        iotEndpoint: this.authManager.getIoTEndpoint(),
+        getCredentials: () => credentialManager.getAWSCredentials(),
       },
       this.log,
     );
@@ -140,9 +137,8 @@ export class MaytronicsAPI extends EventEmitter {
       this.emit('shadowUpdate', shadow);
     });
 
-    this.mqttClient.on('error', (error: Error) => {
-      this.log.error('MQTT error:', error.message);
-    });
+    // MQTTClient already logs errors; the listener keeps EventEmitter from throwing
+    this.mqttClient.on('error', () => undefined);
 
     // Connect to MQTT
     await this.mqttClient.connect();
@@ -162,26 +158,16 @@ export class MaytronicsAPI extends EventEmitter {
 
     if (!this.mqttClient || !this.mqttClient.isConnected()) {
       this.log.debug('MQTT client not connected, reconnecting...');
-      const credentials = this.authManager.getCredentialManager().getAWSCredentials();
-      if (!credentials) {
-        throw new ApiError(ErrorCode.AUTH_AWS_CREDENTIALS_FAILED, 'AWS credentials not available');
-      }
-      await this.initializeMQTTClient(credentials, this.authManager.getIoTEndpoint());
+      await this.connectMQTT();
     }
   }
 
   /**
-   * Check if credentials need refresh
+   * Close the MQTT connection (Homebridge shutdown)
    */
-  needsRefresh(): boolean {
-    return this.authManager.needsRefresh();
-  }
-
-  /**
-   * Ensure credentials are valid (refresh if needed)
-   */
-  async ensureValidCredentials(): Promise<void> {
-    await this.authManager.ensureValidCredentials();
+  disconnect(): void {
+    this.mqttClient?.disconnect();
+    this.mqttClient = undefined;
   }
 
   /**
@@ -216,26 +202,6 @@ export class MaytronicsAPI extends EventEmitter {
   }
 
   /**
-   * Update robot Thing Shadow state via MQTT
-   */
-  async updateThingShadow(serialNumber: string, command: ThingShadowCommand): Promise<boolean> {
-    try {
-      await this.ensureConnectedMQTT();
-
-      const desired = command.state.desired;
-      const success = await this.mqttClient!.updateShadow(desired);
-
-      if (success) {
-        this.log.debug(`Thing Shadow updated for ${serialNumber}`);
-      }
-      return success;
-    } catch (error) {
-      this.log.error('Failed to update Thing Shadow:', getErrorMessage(error));
-      return false;
-    }
-  }
-
-  /**
    * Send a shadow command with standard error handling
    */
   private async sendShadowCommand(
@@ -259,12 +225,7 @@ export class MaytronicsAPI extends EventEmitter {
   /**
    * Send command to start the robot via shadow update
    */
-  async startRobot(serialNumber: string, cleaningMode?: string): Promise<boolean> {
-    // If cleaning mode is specified, set it first
-    if (cleaningMode) {
-      await this.setCleaningMode(serialNumber, cleaningMode);
-    }
-
+  async startRobot(serialNumber: string): Promise<boolean> {
     return this.sendShadowCommand(
       { systemState: { pwsState: 'on' } },
       `Start command sent for ${serialNumber}`,
@@ -292,16 +253,6 @@ export class MaytronicsAPI extends EventEmitter {
   }
 
   /**
-   * Send command to put robot in pickup mode via shadow update
-   */
-  async pickupRobot(serialNumber: string): Promise<boolean> {
-    return this.sendShadowCommand(
-      { cleaningMode: { mode: 'pickup' } },
-      `Pickup command sent for ${serialNumber}`,
-    );
-  }
-
-  /**
    * Get robot information from REST API
    */
   async getRobotInfo(serialNumber: string): Promise<RobotInfo | undefined> {
@@ -312,38 +263,33 @@ export class MaytronicsAPI extends EventEmitter {
       const credentials = this.authManager.getCredentialManager();
       const cognitoToken = credentials.getCognitoToken();
 
-      const response = await httpClient.post(
+      const response = await httpClient.post<RobotDetailsData>(
         '/mobapi/serial-numbers/getRobotDetailsByRobotSN/',
-        `SERNUM=${serialNumber}`,
-        {
-          headers: { Authorization: `Bearer ${cognitoToken}` },
-        },
+        { SERNUM: serialNumber },
+        { bearerToken: cognitoToken },
       );
 
-      if (response.data.Status !== '1') {
+      const data = response.Data;
+      if (response.Status !== '1' || !data) {
         return undefined;
       }
-
-      const data = response.data.Data;
 
       // Get device features
       let features: string[] = [];
       try {
-        const featuresResponse = await httpClient.get(
+        const featuresResponse = await httpClient.get<RobotFeaturesData>(
           '/mobapi/serial-numbers/getSernFeatures/',
           {
             params: {
               device_type: credentials.getDeviceType()?.toString() || '62',
               Sernum: serialNumber,
             },
-            headers: { Authorization: `Bearer ${cognitoToken}` },
+            bearerToken: cognitoToken,
           },
         );
 
-        if (featuresResponse.data.Status === '1' && featuresResponse.data.Data?.features) {
-          features = featuresResponse.data.Data.features.map(
-            (f: { description: string }) => f.description,
-          );
+        if (featuresResponse.Status === '1' && featuresResponse.Data?.features) {
+          features = featuresResponse.Data.features.map((f) => f.description);
         }
       } catch {
         // Features endpoint is optional
@@ -373,21 +319,16 @@ export class MaytronicsAPI extends EventEmitter {
       return [];
     }
 
+    // A failed details lookup must not hide the robot: an empty list would make
+    // the platform unregister its accessory and wipe the user's HomeKit setup
+    const credentials = this.authManager.getCredentialManager();
     const robotInfo = await this.getRobotInfo(serialNumber);
-    return robotInfo ? [robotInfo] : [];
-  }
-
-  /**
-   * Get current serial number
-   */
-  getSerialNumber(): string | undefined {
-    return this.authManager.getCredentialManager().getSerialNumber();
-  }
-
-  /**
-   * Get current robot name
-   */
-  getRobotName(): string | undefined {
-    return this.authManager.getCredentialManager().getRobotName();
+    return [robotInfo ?? {
+      serialNumber,
+      name: credentials.getRobotName() || 'Dolphin Robot',
+      model: 'Unknown Model',
+      deviceType: credentials.getDeviceType() || 62,
+      features: [],
+    }];
   }
 }

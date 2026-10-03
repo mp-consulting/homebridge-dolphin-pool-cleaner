@@ -229,12 +229,17 @@ function parseNewFormat(reported: RawShadowReported): Partial<ParsedRobotState> 
     }
   }
 
+  const nextMode = reported.nextCycleInfo?.cleaningMode?.mode;
+  if (nextMode) {
+    state.nextCycleMode = parseCleaningMode(nextMode);
+  }
+
   // Parse water temperature
   if (reported.inwatTemperature?.temperature !== undefined) {
     state.temperature = reported.inwatTemperature.temperature;
   }
 
-  // Parse filter status
+  // Parse filter status (left undefined when absent, so the known status is kept)
   state.filterStatus = parseFilterStatus(
     reported.filterBagIndication,
     reported.filterIndicator,

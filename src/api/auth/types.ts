@@ -5,16 +5,6 @@
  */
 
 /**
- * AWS Cognito credentials
- */
-export interface CognitoCredentials {
-  idToken: string;
-  accessToken?: string;
-  refreshToken?: string;
-  expiresAt?: Date;
-}
-
-/**
  * AWS IoT temporary credentials (from STS)
  */
 export interface AWSIoTCredentials {
@@ -32,19 +22,6 @@ export interface MyDolphinAuthResult {
   serialNumber: string;
   robotName: string;
   deviceType: number;
-}
-
-/**
- * Complete authentication state
- */
-export interface AuthState {
-  cognitoToken?: string;
-  mobToken?: string;
-  awsCredentials?: AWSIoTCredentials;
-  serialNumber?: string;
-  robotName?: string;
-  deviceType?: number;
-  isAuthenticated: boolean;
 }
 
 /**

@@ -15,23 +15,19 @@
       "email": {
         "title": "Email",
         "type": "string",
-        "required": true,
         "description": "Your MyDolphin Plus account email"
       },
       "password": {
         "title": "Password",
         "type": "string",
-        "required": true,
-        "description": "Your MyDolphin Plus account password"
+        "description": "Optional. Not needed when you sign in with the setup wizard, which stores a refresh token instead of your password"
       },
       "iotRegion": {
         "title": "IoT Region",
         "type": "string",
         "default": "eu-west-1",
         "oneOf": [
-          { "title": "Europe (Ireland)", "enum": ["eu-west-1"] },
-          { "title": "Europe (Frankfurt)", "enum": ["eu-central-1"] },
-          { "title": "US East (Development)", "enum": ["us-east-2"] }
+          { "title": "Europe (Ireland)", "enum": ["eu-west-1"] }
         ],
         "description": "AWS IoT region for your robot"
       },
@@ -64,14 +60,14 @@
               "title": "Device Type",
               "type": "integer",
               "default": 62,
-              "description": "Device type (62 = M400/M600 series)"
+              "description": "Saved by the setup wizard for display; the plugin reads the device type from your account"
             },
             "cleaningMode": {
               "title": "Default Cleaning Mode",
               "type": "string",
-              "default": "regular",
+              "default": "all",
               "oneOf": [
-                { "title": "All Surfaces", "enum": ["regular"] },
+                { "title": "All Surfaces", "enum": ["all"] },
                 { "title": "Fast Mode", "enum": ["short"] },
                 { "title": "Floor Only", "enum": ["floor"] },
                 { "title": "Walls Only", "enum": ["wall"] },

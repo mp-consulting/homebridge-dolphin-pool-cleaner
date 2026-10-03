@@ -3,6 +3,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'fs';
 import {
   MAYTRONICS_API,
   COGNITO,
@@ -41,11 +42,6 @@ describe('Constants', () => {
     it('should have client ID', () => {
       expect(COGNITO.CLIENT_ID).toBeDefined();
       expect(COGNITO.CLIENT_ID.length).toBeGreaterThan(0);
-    });
-
-    it('should have user pool ID', () => {
-      expect(COGNITO.USER_POOL_ID).toBeDefined();
-      expect(COGNITO.USER_POOL_ID).toContain('_');
     });
   });
 
@@ -166,5 +162,34 @@ describe('Constants', () => {
     it('should be at least 5 minutes', () => {
       expect(CREDENTIAL_REFRESH_BUFFER_MS).toBeGreaterThanOrEqual(5 * 60 * 1000);
     });
+  });
+});
+
+describe('Configuration UI', () => {
+  const read = (path: string) => readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
+
+  it('should only offer cleaning modes the plugin can send', () => {
+    const schema = JSON.parse(read('config.schema.json'));
+    const modeField = schema.schema.properties.devices.items.properties.cleaningMode;
+    const offered: string[] = modeField.oneOf.flatMap((option: { enum: string[] }) => option.enum);
+
+    expect(offered.length).toBeGreaterThan(0);
+    expect(offered.filter((mode) => !Object.hasOwn(CLEANING_MODES, mode))).toEqual([]);
+    expect(Object.hasOwn(CLEANING_MODES, modeField.default)).toBe(true);
+  });
+
+  it('should only offer cleaning modes the plugin can send in the setup wizard', () => {
+    const select = read('homebridge-ui/public/index.html').match(/<select id="cleaning-mode"[^>]*>([\s\S]*?)<\/select>/)![1];
+    const offered = [...select.matchAll(/<option value="([^"]+)"/g)].map(([, value]) => value);
+
+    expect(offered.length).toBeGreaterThan(0);
+    expect(offered.filter((mode) => !Object.hasOwn(CLEANING_MODES, mode))).toEqual([]);
+  });
+
+  it('should only offer IoT regions the plugin knows the endpoint of', () => {
+    const schema = JSON.parse(read('config.schema.json'));
+    const regions: string[] = schema.schema.properties.iotRegion.oneOf.flatMap((option: { enum: string[] }) => option.enum);
+
+    expect(regions.filter((region) => !Object.hasOwn(IOT_ENDPOINTS, region))).toEqual([]);
   });
 });

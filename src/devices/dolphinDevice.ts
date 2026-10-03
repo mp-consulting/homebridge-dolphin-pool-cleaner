@@ -16,6 +16,7 @@ import {
   parseShadowState,
   getShadowVersion,
   createDefaultState,
+  parseCleaningMode,
   type ParsedRobotState,
   type RawShadowState,
 } from '../parsers/index.js';
@@ -49,6 +50,7 @@ export class DolphinDevice extends EventEmitter {
   readonly modelName: string;
   private readonly pollingInterval: number;
   private pollingTimer?: ReturnType<typeof setInterval>;
+  private refreshTimer?: ReturnType<typeof setTimeout>;
   private state: ParsedRobotState;
   private lastShadowVersion?: number;
 
@@ -99,6 +101,10 @@ export class DolphinDevice extends EventEmitter {
       clearInterval(this.pollingTimer);
       this.pollingTimer = undefined;
     }
+    if (this.refreshTimer) {
+      clearTimeout(this.refreshTimer);
+      this.refreshTimer = undefined;
+    }
     this.api.removeListener('shadowUpdate', this.handlePushedShadow);
     this.log.debug(`Stopped polling for ${this.name}`);
   }
@@ -122,10 +128,7 @@ export class DolphinDevice extends EventEmitter {
    * Handle a shadow document pushed over MQTT (robot-initiated update)
    */
   private readonly handlePushedShadow = (shadow: RawShadowState): void => {
-    this.state.connected = true;
-    if (this.processShadowState(shadow)) {
-      this.emit('stateChange', this.state);
-    }
+    this.applyShadow(shadow);
   };
 
   /**
@@ -142,9 +145,7 @@ export class DolphinDevice extends EventEmitter {
     try {
       const shadow = await this.api.getThingShadow(this.serialNumber);
       if (shadow) {
-        this.processShadowState(shadow as RawShadowState);
-        this.state.connected = true;
-        this.emit('stateChange', this.state);
+        this.applyShadow(shadow);
       }
     } catch (error) {
       this.log.debug(`Failed to refresh state for ${this.name}:`, error);
@@ -153,6 +154,39 @@ export class DolphinDevice extends EventEmitter {
         this.emit('disconnect');
       }
     }
+  }
+
+  /**
+   * Apply a shadow document and notify listeners when something changed
+   */
+  private applyShadow(shadow: RawShadowState): void {
+    const wasConnected = this.state.connected;
+    const changed = this.processShadowState(shadow);
+    this.state.connected = true;
+    if (changed || !wasConnected) {
+      this.emitStateChange();
+    }
+  }
+
+  /**
+   * Notify listeners with a snapshot, so they cannot mutate the device state
+   */
+  private emitStateChange(): void {
+    this.emit('stateChange', this.getState());
+  }
+
+  /**
+   * Re-read the shadow shortly after a command, once the robot has reacted.
+   * A newer command replaces a pending refresh instead of stacking another one.
+   */
+  private scheduleRefresh(): void {
+    if (this.refreshTimer) {
+      clearTimeout(this.refreshTimer);
+    }
+    this.refreshTimer = unrefTimer(setTimeout(() => {
+      this.refreshTimer = undefined;
+      void this.refreshState();
+    }, STATE_REFRESH_DELAY_MS));
   }
 
   /**
@@ -189,28 +223,37 @@ export class DolphinDevice extends EventEmitter {
    * Start cleaning cycle
    */
   async startCleaning(mode?: string): Promise<boolean> {
-    let apiMode: string | undefined;
-    if (mode && mode in CLEANING_MODES) {
-      apiMode = CLEANING_MODES[mode].apiMode;
+    const resolvedMode = mode === undefined ? undefined : resolveCleaningMode(mode);
+    if (mode !== undefined && !resolvedMode) {
+      this.log.warn(`Unknown cleaning mode "${mode}", starting ${this.name} with its current mode`);
     }
 
-    const success = await this.api.startRobot(this.serialNumber, apiMode);
+    // Only send the mode when the robot is not already set to it: every shadow
+    // request counts against the shared AWS IoT rate limit and delays the start
+    if (resolvedMode && this.state.nextCycleMode !== resolvedMode) {
+      const modeSet = await this.api.setCleaningMode(this.serialNumber, CLEANING_MODES[resolvedMode].apiMode);
+      if (modeSet) {
+        this.state.nextCycleMode = resolvedMode;
+      } else {
+        this.log.warn(`Could not set cleaning mode ${resolvedMode} for ${this.name}, starting with its current mode`);
+      }
+    }
+
+    const success = await this.api.startRobot(this.serialNumber);
 
     if (success) {
       this.log.info(
-        `Started cleaning for ${this.name}${mode ? ` (mode: ${mode})` : ''}`,
+        `Started cleaning for ${this.name}${resolvedMode ? ` (mode: ${resolvedMode})` : ''}`,
       );
 
       // Optimistically update state
       this.state.isCleaning = true;
       this.state.muState = ROBOT_STATES.INIT;
-      if (mode) {
-        this.state.cleaningMode = mode;
+      if (resolvedMode) {
+        this.state.cleaningMode = resolvedMode;
       }
-      this.emit('stateChange', this.state);
-
-      // Refresh state after a short delay
-      unrefTimer(setTimeout(() => void this.refreshState(), STATE_REFRESH_DELAY_MS));
+      this.emitStateChange();
+      this.scheduleRefresh();
     }
 
     return success;
@@ -228,10 +271,8 @@ export class DolphinDevice extends EventEmitter {
       // Optimistically update state
       this.state.isCleaning = false;
       this.state.muState = ROBOT_STATES.OFF;
-      this.emit('stateChange', this.state);
-
-      // Refresh state after a short delay
-      unrefTimer(setTimeout(() => void this.refreshState(), STATE_REFRESH_DELAY_MS));
+      this.emitStateChange();
+      this.scheduleRefresh();
     }
 
     return success;
@@ -241,38 +282,30 @@ export class DolphinDevice extends EventEmitter {
    * Set cleaning mode
    */
   async setCleaningMode(mode: string): Promise<boolean> {
-    if (!(mode in CLEANING_MODES)) {
+    const resolvedMode = resolveCleaningMode(mode);
+    if (!resolvedMode) {
       this.log.warn(`Unknown cleaning mode: ${mode}`);
       return false;
     }
 
-    const apiMode = CLEANING_MODES[mode].apiMode;
-    const success = await this.api.setCleaningMode(this.serialNumber, apiMode);
+    const success = await this.api.setCleaningMode(this.serialNumber, CLEANING_MODES[resolvedMode].apiMode);
 
     if (success) {
-      this.log.info(`Set cleaning mode to ${mode} for ${this.name}`);
-      this.state.cleaningMode = mode;
-      this.emit('stateChange', this.state);
+      this.log.info(`Set cleaning mode to ${resolvedMode} for ${this.name}`);
+      this.state.cleaningMode = resolvedMode;
+      this.state.nextCycleMode = resolvedMode;
+      this.emitStateChange();
     }
 
     return success;
   }
+}
 
-  /**
-   * Initiate pickup mode (robot goes to pickup point)
-   */
-  async pickup(): Promise<boolean> {
-    const success = await this.api.pickupRobot(this.serialNumber);
-
-    if (success) {
-      this.log.info(`Initiated pickup for ${this.name}`);
-      this.state.muState = ROBOT_STATES.PICKUP;
-      this.emit('stateChange', this.state);
-
-      // Refresh state after a short delay
-      unrefTimer(setTimeout(() => void this.refreshState(), STATE_REFRESH_DELAY_MS));
-    }
-
-    return success;
-  }
+/**
+ * Map a configured mode (including legacy aliases such as "regular") to a
+ * CLEANING_MODES key, or undefined when it is not a known mode
+ */
+export function resolveCleaningMode(mode: string): string | undefined {
+  const normalized = parseCleaningMode(mode);
+  return Object.hasOwn(CLEANING_MODES, normalized) ? normalized : undefined;
 }

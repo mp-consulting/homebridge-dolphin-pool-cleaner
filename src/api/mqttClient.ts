@@ -20,7 +20,6 @@ import { createHmac, createHash } from 'crypto';
 import type { Logger } from 'homebridge';
 import type { AWSIoTCredentials } from './auth/types.js';
 import type { RawShadowState } from '../parsers/types.js';
-import { buildCommand } from '../protocol/commandBuilder.js';
 import {
   SERIAL_NUMBER_LENGTH,
   SHADOW_TIMEOUT_MS,
@@ -39,14 +38,16 @@ import {
   SHADOW_COMMAND_RETRY_MAX_ATTEMPTS,
   SHADOW_COMMAND_RETRY_BASE_DELAY_MS,
 } from '../config/constants.js';
-import { MQTTError, ErrorCode } from '../utils/errors.js';
+import { MQTTError, ErrorCode, getErrorMessage } from '../utils/errors.js';
 import { unrefTimer } from '../utils/timers.js';
 
 export interface MQTTClientConfig {
   serialNumber: string;
   region: string;
   iotEndpoint: string;
-  credentials: AWSIoTCredentials;
+  // Read on every (re)connection, so automatic reconnects never sign the
+  // WebSocket URL with credentials that have since been refreshed
+  getCredentials: () => AWSIoTCredentials | undefined;
 }
 
 /**
@@ -124,11 +125,14 @@ export class MQTTClient extends EventEmitter {
   private readonly truncatedSerial: string;
   private readonly region: string;
   private readonly iotEndpoint: string;
-  private credentials: AWSIoTCredentials;
+  private readonly getCredentials: () => AWSIoTCredentials | undefined;
   private connected = false;
+  private pendingConnect?: {
+    promise: Promise<void>;
+    reject: (error: Error) => void;
+  };
   private reconnectAttempts = 0;
   private readonly maxReconnectAttempts = 5;
-  private currentShadow: RawShadowState | null = null;
   private lastShadowReceivedAt = 0;
   // Shadow request pacing / throttle bookkeeping
   private readonly pendingRequests = new Map<string, PendingShadowRequest>();
@@ -146,28 +150,54 @@ export class MQTTClient extends EventEmitter {
     this.truncatedSerial = config.serialNumber.substring(0, SERIAL_NUMBER_LENGTH);
     this.region = config.region;
     this.iotEndpoint = config.iotEndpoint;
-    this.credentials = config.credentials;
+    this.getCredentials = config.getCredentials;
   }
 
   /**
-   * Connect to AWS IoT Core via MQTT over WebSocket
+   * Connect to AWS IoT Core via MQTT over WebSocket.
+   *
+   * Always settles: mqtt.js keeps retrying silently on some failures (e.g. a
+   * 403 handshake), so the attempt is bounded by MQTT_CONNECT_TIMEOUT_MS.
    */
   async connect(): Promise<void> {
     if (this.connected) {
       this.log.debug('MQTT client already connected');
       return;
     }
+    if (this.pendingConnect) {
+      return this.pendingConnect.promise;
+    }
 
-    return new Promise<void>((resolve, reject) => {
+    const attempt: { settled: boolean; timer?: ReturnType<typeof setTimeout> } = { settled: false };
+    let finish!: (error?: Error) => void;
+    const promise = new Promise<void>((resolve, reject) => {
+      finish = (error?: Error): void => {
+        if (attempt.settled) {
+          return;
+        }
+        attempt.settled = true;
+        clearTimeout(attempt.timer);
+        this.pendingConnect = undefined;
+        if (error) {
+          reject(error);
+        } else {
+          resolve();
+        }
+      };
+      const fail = (error: Error): void => finish(error);
+
+      attempt.timer = unrefTimer(setTimeout(() => {
+        fail(new MQTTError(ErrorCode.MQTT_CONNECTION_FAILED, 'Timed out connecting to AWS IoT'));
+        this.disconnect();
+      }, MQTT_CONNECT_TIMEOUT_MS));
+
       try {
-        const signedUrl = this.getSignedWebSocketUrl();
-        this.log.debug(`Connecting to AWS IoT MQTT: wss://${this.iotEndpoint}/mqtt`);
-
         // Use a client ID format that matches what the IAM policy expects
         const clientId = `${this.truncatedSerial}_App_Token`;
-        this.log.debug(`MQTT client ID: ${clientId} (truncated from ${this.serialNumber})`);
+        this.log.debug(`Connecting to AWS IoT MQTT: wss://${this.iotEndpoint}/mqtt (client ID ${clientId})`);
 
-        this.client = mqtt.connect(signedUrl, {
+        // The URL is re-signed on every connection attempt via transformWsUrl
+        this.client = mqtt.connect(`wss://${this.iotEndpoint}/mqtt`, {
           clientId,
           clean: true,
           reconnectPeriod: MQTT_RECONNECT_PERIOD_MS,
@@ -176,14 +206,18 @@ export class MQTTClient extends EventEmitter {
           protocol: 'wss',
           protocolVersion: 4,
           rejectUnauthorized: true,
+          transformWsUrl: (url) => this.signWebSocketUrl(url),
         });
 
-        this.client.on('connect', async () => {
+        this.client.on('connect', () => {
           this.connected = true;
           this.reconnectAttempts = 0;
-          await this.subscribeToTopics();
-          this.emit('connected');
-          resolve();
+          this.subscribeToTopics()
+            .catch((error) => this.log.warn('Failed to subscribe to MQTT topics:', getErrorMessage(error)))
+            .finally(() => {
+              this.emit('connected');
+              finish();
+            });
         });
 
         this.client.on('message', (topic: string, payload: Buffer) => {
@@ -194,7 +228,7 @@ export class MQTTClient extends EventEmitter {
           this.log.error('MQTT error:', error.message);
           this.emit('error', error);
           if (!this.connected) {
-            reject(new MQTTError(ErrorCode.MQTT_CONNECTION_FAILED, error.message, { cause: error }));
+            fail(new MQTTError(ErrorCode.MQTT_CONNECTION_FAILED, error.message, { cause: error }));
           }
         });
 
@@ -215,16 +249,39 @@ export class MQTTClient extends EventEmitter {
           }
         });
       } catch (error) {
-        this.log.error('Failed to create MQTT connection:', error);
-        reject(error);
+        this.log.error('Failed to create MQTT connection:', getErrorMessage(error));
+        fail(error instanceof Error ? error : new Error(String(error)));
       }
     });
+
+    if (!attempt.settled) {
+      this.pendingConnect = { promise, reject: (error) => finish(error) };
+    }
+    return promise;
+  }
+
+  /**
+   * Sign a connection attempt. Runs inside mqtt.js's reconnect timer, where a
+   * throw would crash Homebridge, so a failure falls back to the unsigned URL
+   * (the broker rejects it and the attempt counts towards the reconnect limit).
+   */
+  private signWebSocketUrl(url: string): string {
+    try {
+      return this.getSignedWebSocketUrl();
+    } catch (error) {
+      this.log.error('Could not sign the AWS IoT WebSocket URL:', getErrorMessage(error));
+      return url;
+    }
   }
 
   /**
    * Generate AWS Signature V4 signed WebSocket URL
    */
   private getSignedWebSocketUrl(): string {
+    const credentials = this.getCredentials();
+    if (!credentials) {
+      throw new MQTTError(ErrorCode.MQTT_CONNECTION_FAILED, 'AWS credentials not available');
+    }
     const host = this.iotEndpoint;
     const service = 'iotdevicegateway';
     const method = 'GET';
@@ -239,7 +296,7 @@ export class MQTTClient extends EventEmitter {
     // Build canonical query string (sorted alphabetically, URL-encoded)
     const queryParamsForSigning = [
       ['X-Amz-Algorithm', algorithm],
-      ['X-Amz-Credential', `${this.credentials.accessKeyId}/${credentialScope}`],
+      ['X-Amz-Credential', `${credentials.accessKeyId}/${credentialScope}`],
       ['X-Amz-Date', amzDate],
       ['X-Amz-Expires', AWS_SIGNATURE_EXPIRY_SECONDS],
       ['X-Amz-SignedHeaders', 'host'],
@@ -269,7 +326,7 @@ export class MQTTClient extends EventEmitter {
     const stringToSign = [algorithm, amzDate, credentialScope, hashedCanonicalRequest].join('\n');
 
     // Calculate signature
-    const kDate = createHmac('sha256', `AWS4${this.credentials.secretAccessKey}`)
+    const kDate = createHmac('sha256', `AWS4${credentials.secretAccessKey}`)
       .update(dateStamp)
       .digest();
     const kRegion = createHmac('sha256', kDate).update(this.region).digest();
@@ -280,8 +337,8 @@ export class MQTTClient extends EventEmitter {
     // Build final URL with signature and security token
     let finalUrl = `wss://${host}${path}?${canonicalQuerystring}&X-Amz-Signature=${signature}`;
 
-    if (this.credentials.sessionToken) {
-      finalUrl += `&X-Amz-Security-Token=${this.uriEncode(this.credentials.sessionToken)}`;
+    if (credentials.sessionToken) {
+      finalUrl += `&X-Amz-Security-Token=${this.uriEncode(credentials.sessionToken)}`;
     }
 
     this.log.debug('Signed WebSocket URL generated');
@@ -348,10 +405,14 @@ export class MQTTClient extends EventEmitter {
       const clientToken = typeof message?.clientToken === 'string' ? message.clientToken : undefined;
 
       if (topic.includes('/shadow/get/accepted') || topic.includes('/shadow/update/accepted')) {
-        this.currentShadow = message as RawShadowState;
-        this.lastShadowReceivedAt = Date.now();
-        this.emit('shadowUpdate', this.currentShadow);
-        this.settlePendingRequest(clientToken, { accepted: true, shadow: this.currentShadow });
+        const shadow = message as RawShadowState;
+        // An echo of a desired-only update carries no robot state, so it must
+        // not make polling believe the state is fresh
+        if (shadow.state?.reported) {
+          this.lastShadowReceivedAt = Date.now();
+        }
+        this.emit('shadowUpdate', shadow);
+        this.settlePendingRequest(clientToken, { accepted: true, shadow });
       } else if (topic.includes('/shadow/get/rejected') || topic.includes('/shadow/update/rejected')) {
         this.logShadowRejection(message as ShadowRejection);
         this.emit('shadowRejected', message);
@@ -577,70 +638,6 @@ export class MQTTClient extends EventEmitter {
   }
 
   /**
-   * Send command via dynamic channel (Maytronics/{serial}/main)
-   */
-  async sendDynamicCommand(command: Record<string, unknown>): Promise<boolean> {
-    this.ensureConnected();
-
-    const payload = JSON.stringify(command);
-    const topic = `Maytronics/${this.truncatedSerial}/main`;
-
-    return new Promise<boolean>((resolve) => {
-      this.client!.publish(topic, payload, { qos: 1 }, (err?: Error) => {
-        if (err) {
-          this.log.error('Failed to send dynamic command:', err.message);
-          resolve(false);
-        } else {
-          this.log.debug(`Sent dynamic command on ${topic}:`, payload);
-          resolve(true);
-        }
-      });
-    });
-  }
-
-  /**
-   * Send a named command via the dynamic channel using the BLE protocol format
-   */
-  async sendCommand(commandName: string, data?: string): Promise<boolean> {
-    this.ensureConnected();
-
-    const builtCommand = buildCommand(commandName, data);
-    if (!builtCommand) {
-      this.log.error(`Failed to build command: ${commandName}`);
-      return false;
-    }
-
-    const topic = `Maytronics/${this.truncatedSerial}/main`;
-    this.log.info(`Sending command ${commandName} to ${topic} (${builtCommand.buffer.length} bytes)`);
-    this.log.debug(`Command hex: ${builtCommand.hex}`);
-
-    return new Promise<boolean>((resolve) => {
-      this.client!.publish(topic, builtCommand.buffer, { qos: 1 }, (err?: Error) => {
-        if (err) {
-          this.log.error(`Failed to send command ${commandName}:`, err.message);
-          resolve(false);
-        } else {
-          this.log.info(`Command ${commandName} sent successfully`);
-          resolve(true);
-        }
-      });
-    });
-  }
-
-  /**
-   * Update credentials (for refresh)
-   */
-  updateCredentials(credentials: AWSIoTCredentials): void {
-    this.credentials = credentials;
-    if (this.connected) {
-      this.disconnect();
-      this.connect().catch((err) => {
-        this.log.error('Failed to reconnect with new credentials:', err.message);
-      });
-    }
-  }
-
-  /**
    * Disconnect from MQTT broker
    */
   disconnect(): void {
@@ -649,6 +646,9 @@ export class MQTTClient extends EventEmitter {
       this.client = undefined;
     }
     this.connected = false;
+    this.pendingConnect?.reject(
+      new MQTTError(ErrorCode.MQTT_NOT_CONNECTED, 'MQTT disconnected before the connection completed'),
+    );
 
     // In-flight requests can no longer be answered; fail them now instead of
     // waiting for their timeouts
@@ -666,13 +666,6 @@ export class MQTTClient extends EventEmitter {
    */
   isConnected(): boolean {
     return this.connected;
-  }
-
-  /**
-   * Get current shadow
-   */
-  getCurrentShadow(): RawShadowState | null {
-    return this.currentShadow;
   }
 
   /**

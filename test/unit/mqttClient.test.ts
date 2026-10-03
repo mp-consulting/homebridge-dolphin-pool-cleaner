@@ -3,18 +3,27 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import * as mqtt from 'mqtt';
 import { createMockLogger } from '../mocks/index.js';
+import { createMockMqttClient } from '../mocks/mqtt.mock.js';
+
+vi.mock('mqtt', () => ({
+  connect: vi.fn(),
+}));
+
+const TEST_CREDENTIALS = {
+  accessKeyId: 'AKIAIOSFODNN7EXAMPLE',
+  secretAccessKey: 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY',
+  sessionToken: 'mock-session-token',
+  expiration: new Date('2099-01-01T00:00:00Z'),
+};
 
 describe('MQTTClient', () => {
   let mockLogger: ReturnType<typeof createMockLogger>;
 
   const mockConfig = {
     serialNumber: 'E3086OFG2M',
-    credentials: {
-      accessKeyId: 'AKIAIOSFODNN7EXAMPLE',
-      secretAccessKey: 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY',
-      sessionToken: 'mock-session-token',
-    },
+    getCredentials: () => TEST_CREDENTIALS,
     iotEndpoint: 'mock-iot-endpoint.iot.eu-west-1.amazonaws.com',
     region: 'eu-west-1',
   };
@@ -39,60 +48,6 @@ describe('MQTTClient', () => {
     });
   });
 
-  describe('methods', () => {
-    it('should have connect method', async () => {
-      const { MQTTClient } = await import('../../src/api/mqttClient.js');
-
-      const client = new MQTTClient(mockConfig, mockLogger);
-
-      expect(typeof client.connect).toBe('function');
-    });
-
-    it('should have disconnect method', async () => {
-      const { MQTTClient } = await import('../../src/api/mqttClient.js');
-
-      const client = new MQTTClient(mockConfig, mockLogger);
-
-      expect(typeof client.disconnect).toBe('function');
-    });
-
-    it('should have getShadow method', async () => {
-      const { MQTTClient } = await import('../../src/api/mqttClient.js');
-
-      const client = new MQTTClient(mockConfig, mockLogger);
-
-      expect(typeof client.getShadow).toBe('function');
-    });
-
-    it('should have updateShadow method', async () => {
-      const { MQTTClient } = await import('../../src/api/mqttClient.js');
-
-      const client = new MQTTClient(mockConfig, mockLogger);
-
-      expect(typeof client.updateShadow).toBe('function');
-    });
-
-    it('should have sendDynamicCommand method', async () => {
-      const { MQTTClient } = await import('../../src/api/mqttClient.js');
-
-      const client = new MQTTClient(mockConfig, mockLogger);
-
-      expect(typeof client.sendDynamicCommand).toBe('function');
-    });
-  });
-
-  describe('event emitter', () => {
-    it('should support event listeners', async () => {
-      const { MQTTClient } = await import('../../src/api/mqttClient.js');
-
-      const client = new MQTTClient(mockConfig, mockLogger);
-
-      expect(typeof client.on).toBe('function');
-      expect(typeof client.emit).toBe('function');
-      expect(typeof client.removeListener).toBe('function');
-    });
-  });
-
   describe('error handling', () => {
     it('should throw when getShadow called while not connected', async () => {
       const { MQTTClient } = await import('../../src/api/mqttClient.js');
@@ -112,43 +67,12 @@ describe('MQTTClient', () => {
   });
 });
 
-describe('MQTTClient - SigV4 Signing', () => {
-  let mockLogger: ReturnType<typeof createMockLogger>;
-
-  const mockConfig = {
-    serialNumber: 'E3086OFG2M',
-    credentials: {
-      accessKeyId: 'AKIAIOSFODNN7EXAMPLE',
-      secretAccessKey: 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY',
-      sessionToken: 'mock-session-token',
-    },
-    iotEndpoint: 'mock-iot-endpoint.iot.eu-west-1.amazonaws.com',
-    region: 'eu-west-1',
-  };
-
-  beforeEach(() => {
-    mockLogger = createMockLogger();
-  });
-
-  it('should create client without throwing (URL generation)', async () => {
-    const { MQTTClient } = await import('../../src/api/mqttClient.js');
-
-    expect(() => {
-      new MQTTClient(mockConfig, mockLogger);
-    }).not.toThrow();
-  });
-});
-
 describe('MQTTClient - shadow rate limiting', () => {
   let mockLogger: ReturnType<typeof createMockLogger>;
 
   const mockConfig = {
     serialNumber: 'E3086OFG2M',
-    credentials: {
-      accessKeyId: 'AKIAIOSFODNN7EXAMPLE',
-      secretAccessKey: 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY',
-      sessionToken: 'mock-session-token',
-    },
+    getCredentials: () => TEST_CREDENTIALS,
     iotEndpoint: 'mock-iot-endpoint.iot.eu-west-1.amazonaws.com',
     region: 'eu-west-1',
   };
@@ -385,5 +309,122 @@ describe('MQTTClient - shadow rate limiting', () => {
     await vi.advanceTimersByTimeAsync(10000);
 
     await expect(result).resolves.toMatchObject({ version: 7 });
+  });
+});
+
+describe('MQTTClient - connection', () => {
+  let mockLogger: ReturnType<typeof createMockLogger>;
+  let broker: ReturnType<typeof createMockMqttClient>;
+  let credentials: typeof TEST_CREDENTIALS | undefined;
+
+  const createClient = async () => {
+    const { MQTTClient } = await import('../../src/api/mqttClient.js');
+    return new MQTTClient({
+      serialNumber: 'E3086OFG2M',
+      region: 'eu-west-1',
+      iotEndpoint: 'mock-iot-endpoint.iot.eu-west-1.amazonaws.com',
+      getCredentials: () => credentials,
+    }, mockLogger);
+  };
+
+  /** Options passed to mqtt.connect on the last call */
+  const connectOptions = () => vi.mocked(mqtt.connect).mock.lastCall![1] as unknown as {
+    transformWsUrl: (url: string) => string;
+  };
+
+  beforeEach(() => {
+    mockLogger = createMockLogger();
+    credentials = { ...TEST_CREDENTIALS };
+    broker = createMockMqttClient();
+    vi.mocked(mqtt.connect).mockReset().mockReturnValue(broker as unknown as mqtt.MqttClient);
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('should resolve once connected and subscribed to the shadow topics', async () => {
+    const client = await createClient();
+
+    const connecting = client.connect();
+    broker._simulateConnect();
+    await vi.advanceTimersByTimeAsync(0);
+
+    await expect(connecting).resolves.toBeUndefined();
+    expect(client.isConnected()).toBe(true);
+    expect(broker.subscribe).toHaveBeenCalledTimes(5);
+  });
+
+  it('should reject when the broker never answers instead of hanging', async () => {
+    const client = await createClient();
+
+    const connecting = expect(client.connect()).rejects.toThrow('Timed out connecting to AWS IoT');
+    await vi.advanceTimersByTimeAsync(30_000);
+
+    await connecting;
+    expect(broker.end).toHaveBeenCalled();
+  });
+
+  it('should reject a pending connection when disconnected', async () => {
+    const client = await createClient();
+
+    const connecting = expect(client.connect()).rejects.toThrow('before the connection completed');
+    client.disconnect();
+
+    await connecting;
+  });
+
+  it('should share one connection attempt between concurrent callers', async () => {
+    const client = await createClient();
+
+    const first = client.connect();
+    const second = client.connect();
+    broker._simulateConnect();
+    await vi.advanceTimersByTimeAsync(0);
+
+    await Promise.all([first, second]);
+    expect(mqtt.connect).toHaveBeenCalledTimes(1);
+  });
+
+  it('should sign every connection attempt with the current credentials', async () => {
+    const client = await createClient();
+    void client.connect().catch(() => undefined);
+    const { transformWsUrl } = connectOptions();
+
+    const firstUrl = transformWsUrl('wss://unsigned/mqtt');
+    credentials = { ...TEST_CREDENTIALS, accessKeyId: 'AKIAREFRESHED', sessionToken: 'new token/+=' };
+    const reconnectUrl = transformWsUrl('wss://unsigned/mqtt');
+
+    expect(firstUrl).toContain('X-Amz-Credential=AKIAIOSFODNN7EXAMPLE');
+    expect(reconnectUrl).toContain('X-Amz-Credential=AKIAREFRESHED');
+    expect(reconnectUrl).toContain('X-Amz-Security-Token=new%20token%2F%2B%3D');
+    expect(reconnectUrl).toMatch(/X-Amz-Signature=[0-9a-f]{64}/);
+    client.disconnect();
+  });
+
+  it('should not throw from the reconnect timer when credentials are missing', async () => {
+    const client = await createClient();
+    void client.connect().catch(() => undefined);
+    const { transformWsUrl } = connectOptions();
+
+    credentials = undefined;
+
+    expect(transformWsUrl('wss://unsigned/mqtt')).toBe('wss://unsigned/mqtt');
+    expect(mockLogger.error).toHaveBeenCalledWith('Could not sign the AWS IoT WebSocket URL:', expect.any(String));
+    client.disconnect();
+  });
+
+  it('should only count shadows carrying reported state as fresh', async () => {
+    const client = await createClient();
+    const handleMessage = (topic: string, payload: unknown) =>
+      (client as any).handleMessage(topic, Buffer.from(JSON.stringify(payload)));
+
+    // Echo of a desired-only update (ours or the phone app's)
+    handleMessage('$aws/things/E3086OFG/shadow/update/accepted', { state: { desired: { a: 1 } }, version: 3 });
+    expect(client.getLastShadowReceivedAt()).toBe(0);
+
+    handleMessage('$aws/things/E3086OFG/shadow/update/accepted', { state: { reported: { a: 1 } }, version: 4 });
+    expect(client.getLastShadowReceivedAt()).toBeGreaterThan(0);
   });
 });

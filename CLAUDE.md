@@ -7,17 +7,17 @@ Homebridge plugin (`@mp-consulting/homebridge-dolphin-pool-cleaner`) for Maytron
 ## Tech Stack
 
 - **Language**: TypeScript (strict, ES2022, ESM via NodeNext)
-- **Runtime**: Node.js >= 18, Homebridge >= 1.6.0
+- **Runtime**: Node.js ^22.10 / ^24 / ^26, Homebridge ^1.8 or ^2
 - **Testing**: Vitest
-- **Linting**: ESLint 9 flat config with typescript-eslint
-- **Cloud**: AWS Cognito (auth) + AWS IoT MQTT (real-time updates)
+- **Linting**: ESLint 10 flat config with typescript-eslint
+- **Cloud**: AWS Cognito (auth) + MyDolphin REST via native `fetch` + AWS IoT MQTT (real-time updates)
 
 ## Commands
 
 - `npm run build` — Compile TypeScript and copy assets to `dist/`
 - `npm run lint` — Lint with zero warnings
 - `npm test` — Run tests (Vitest)
-- `npm run test:coverage` — Tests with coverage
+- `npm run test:coverage` — Tests with coverage (thresholds enforced; CI runs this)
 - `npm run watch` — Build, link, and watch with nodemon
 
 ## Project Structure
@@ -47,6 +47,9 @@ homebridge-ui/                  # Custom setup wizard UI
 - **DynamicPlatformPlugin** pattern with cached accessory restoration
 - **AWS IoT MQTT** for real-time state via Shadow document subscriptions
 - **Polling fallback** with configurable interval (30-600s, default 60s)
+- **Discovery retries** with exponential backoff (30s → 10min) when the cloud is unreachable at startup; bad credentials are not retried
+- **Shutdown**: devices stop polling and MQTT disconnects on Homebridge `shutdown`
+- **Single-flight** login and MQTT connect: concurrent callers share one attempt (AWS IoT drops duplicate client IDs)
 - **Parser layer** decodes AWS Shadow state into device properties
 - **Command builder** constructs IoT commands from BLE command protocol definitions
 - **Custom UI**: Uses Homebridge custom UI framework (`homebridge-ui/`) for plugin configuration management

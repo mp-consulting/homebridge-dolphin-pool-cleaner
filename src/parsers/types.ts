@@ -141,6 +141,10 @@ export interface RawShadowReported {
   systemState?: SystemStateData;
   robotState?: RobotStateData;
   cycleInfo?: CycleInfoData;
+  nextCycleInfo?: {
+    cleaningMode?: { mode?: string };
+    nextCycleDuration?: number;
+  };
   inwatTemperature?: TemperatureData;
   filterBagIndication?: FilterData;
   filterIndicator?: FilterData;
@@ -184,6 +188,8 @@ export interface ParsedRobotState {
   pwsState: number;
   isCleaning: boolean;
   cleaningMode: string;
+  // Mode the robot will use for its next cycle, as reported by the robot
+  nextCycleMode?: string;
   cycleTime: number;
   cycleTimeRemaining: number;
   filterStatus: FilterStatus;

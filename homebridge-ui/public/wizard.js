@@ -74,12 +74,12 @@
       description: 'User-defined cleaning cycle with custom duration.',
       duration: 120,
     },
-    regular: {
-      name: 'All Surfaces',
-      description: 'Full pool cleaning covering floor, walls, and waterline.',
-      duration: 150,
-    },
   };
+
+  // Older versions saved "regular", which the plugin treats as "all"
+  function normalizeCleaningMode(mode) {
+    return mode === 'regular' ? 'all' : mode;
+  }
 
   const ROBOT_SVG = `<svg viewBox="0 0 200 160" xmlns="http://www.w3.org/2000/svg">
     <defs>
@@ -260,7 +260,7 @@
   }
 
   function getCleaningModeText(mode) {
-    const modeInfo = CLEANING_MODE_DETAILS[mode];
+    const modeInfo = CLEANING_MODE_DETAILS[normalizeCleaningMode(mode)];
     if (modeInfo) {
       return `${modeInfo.name} (${formatDuration(modeInfo.duration)})`;
     }
@@ -509,8 +509,6 @@
       robotName: result.robotName,
       deviceType: result.deviceType,
       robotImageUrl: result.robotImageUrl,
-      idToken: result.idToken,
-      accessToken: result.accessToken,
       refreshToken: result.refreshToken,
     };
 
@@ -625,8 +623,8 @@
       if (existingConfig.devices?.length > 0) {
         const device = existingConfig.devices[0];
         if (device.cleaningMode) {
-          dom.cleaningMode.value = device.cleaningMode;
-          updateModeInfo(device.cleaningMode);
+          dom.cleaningMode.value = normalizeCleaningMode(device.cleaningMode);
+          updateModeInfo(normalizeCleaningMode(device.cleaningMode));
         }
         if (device.enableTemperature !== undefined) {
           dom.enableTemperature.checked = device.enableTemperature;
@@ -743,8 +741,8 @@
 
     // Pre-fill form
     if (device.cleaningMode) {
-      dom.cleaningMode.value = device.cleaningMode;
-      updateModeInfo(device.cleaningMode);
+      dom.cleaningMode.value = normalizeCleaningMode(device.cleaningMode);
+      updateModeInfo(normalizeCleaningMode(device.cleaningMode));
     }
     if (state.savedConfig.pollingInterval) {
       dom.pollingInterval.value = state.savedConfig.pollingInterval.toString();

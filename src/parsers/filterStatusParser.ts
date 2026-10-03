@@ -16,16 +16,17 @@ import { FILTER_NEEDS_CLEANING_THRESHOLD } from '../config/constants.js';
  *
  * @param filterBagData - filterBagIndication data from shadow
  * @param filterIndicatorData - filterIndicator data from shadow
- * @returns Filter status
+ * @returns Filter status, or undefined when the shadow carries no filter data
+ *   (partial shadow pushes must not reset a known status)
  */
 export function parseFilterStatus(
   filterBagData?: FilterData,
   filterIndicatorData?: FilterData,
-): FilterStatus {
+): FilterStatus | undefined {
   const filterData = filterBagData || filterIndicatorData;
 
   if (!filterData) {
-    return 'ok';
+    return undefined;
   }
 
   // Check for numeric state (0-100 percentage)

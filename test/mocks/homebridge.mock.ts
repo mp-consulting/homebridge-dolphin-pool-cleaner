@@ -235,7 +235,9 @@ export function createMockAPI(): API {
       },
     },
 
-    platformAccessory: vi.fn((displayName: string, uuid: string) => {
+    // A regular function, so the platform can call it with `new`
+    // eslint-disable-next-line prefer-arrow-callback
+    platformAccessory: vi.fn(function (displayName: string, uuid: string) {
       return createMockPlatformAccessory(displayName, uuid);
     }),
 

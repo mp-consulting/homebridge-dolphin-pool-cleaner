@@ -6,443 +6,209 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { EventEmitter } from 'events';
 import {
   createMockLogger,
-  createMockAPI,
   createMockPlatformAccessory,
   MockServices,
   MockCharacteristics,
 } from '../mocks/index.js';
+import { DolphinAccessory } from '../../src/accessories/dolphinAccessory.js';
+import type { DeviceConfig } from '../../src/platform.js';
+import { createDefaultState } from '../../src/parsers/index.js';
 
-// Mock DolphinDevice
-class MockDolphinDevice extends EventEmitter {
-  serialNumber = 'E3086OFG2M';
-  name = 'Dolphin M400';
-
-  private state = {
-    isCleaning: false,
-    isConnected: true,
-    currentMode: 'all',
-    cycleTimeRemaining: 0,
-    waterTemperature: undefined as number | undefined,
-    filterStatus: 'ok' as 'ok' | 'needs_cleaning',
-    hasError: false,
-    errorCode: 0,
-    errorMessage: undefined as string | undefined,
-    cycleStartTime: undefined as Date | undefined,
-  };
-
-  getState = vi.fn(() => this.state);
-  getFeatures = vi.fn(() => ({
-    hasTemperature: true,
-    hasFilter: true,
-    hasLed: false,
-    hasDelay: true,
-    supportedModes: ['all', 'short', 'floor', 'wall', 'water'],
-  }));
-  getAvailableModes = vi.fn(() => ['all', 'short', 'floor', 'wall', 'water']);
-  startCleaning = vi.fn().mockResolvedValue(true);
-  stopCleaning = vi.fn().mockResolvedValue(true);
-  initialize = vi.fn().mockResolvedValue(undefined);
-  stopPolling = vi.fn();
-
-  // Test helpers
-  _setState(newState: Partial<typeof this.state>) {
-    Object.assign(this.state, newState);
-    this.emit('stateChange', this.state);
-  }
-
-  _emitError(error: Error) {
-    this.emit('error', error);
+class MockHapStatusError extends Error {
+  constructor(readonly hapStatus: number) {
+    super(`HAP status ${hapStatus}`);
   }
 }
 
-// We need to import the actual module to test it
-// For this test, we'll test the accessory behavior
+const FilterChangeIndication = { ...MockCharacteristics.FilterChangeIndication, FILTER_OK: 0, CHANGE_FILTER: 1 };
 
 describe('DolphinAccessory', () => {
-  let mockApi: ReturnType<typeof createMockAPI>;
-  let mockLogger: ReturnType<typeof createMockLogger>;
-  let mockAccessory: ReturnType<typeof createMockPlatformAccessory>;
-  let mockDevice: MockDolphinDevice;
-
-  const mockPlatform = {
-    Service: MockServices,
-    Characteristic: MockCharacteristics,
-    log: null as ReturnType<typeof createMockLogger> | null,
-    api: null as ReturnType<typeof createMockAPI> | null,
-    config: {
-      platform: 'DolphinPoolCleaner',
-      name: 'Test Platform',
-    },
-  };
-
-  beforeEach(() => {
-    mockApi = createMockAPI();
-    mockLogger = createMockLogger();
-    mockPlatform.log = mockLogger;
-    mockPlatform.api = mockApi;
-
-    mockAccessory = createMockPlatformAccessory('Dolphin M400', 'test-uuid-123');
-    mockDevice = new MockDolphinDevice();
-  });
-
-  afterEach(() => {
-    vi.clearAllMocks();
-    mockDevice.removeAllListeners();
-  });
-
-  describe('Service Setup', () => {
-    it('should set up accessory information', () => {
-      const infoService = mockAccessory.getService(MockServices.AccessoryInformation);
-
-      expect(infoService).toBeDefined();
-    });
-
-    it('should add switch service', () => {
-      const switchService = mockAccessory.addService(MockServices.Switch);
-
-      expect(switchService).toBeDefined();
-      expect(mockAccessory.addService).toHaveBeenCalledWith(MockServices.Switch);
-    });
-
-    it('should add temperature sensor service when supported', () => {
-      const tempService = mockAccessory.addService(MockServices.TemperatureSensor);
-
-      expect(tempService).toBeDefined();
-    });
-
-    it('should add filter maintenance service when supported', () => {
-      const filterService = mockAccessory.addService(MockServices.FilterMaintenance);
-
-      expect(filterService).toBeDefined();
-    });
-  });
-
-  describe('Switch Characteristic', () => {
-    let switchService: ReturnType<typeof mockAccessory.addService>;
-
-    beforeEach(() => {
-      switchService = mockAccessory.addService(MockServices.Switch);
-    });
-
-    it('should get On characteristic', () => {
-      const onChar = switchService.getCharacteristic(MockCharacteristics.On);
-
-      expect(onChar).toBeDefined();
-    });
-
-    it('should return false when not cleaning', () => {
-      mockDevice._setState({ isCleaning: false });
-
-      const state = mockDevice.getState();
-
-      expect(state.isCleaning).toBe(false);
-    });
-
-    it('should return true when cleaning', () => {
-      mockDevice._setState({ isCleaning: true });
-
-      const state = mockDevice.getState();
-
-      expect(state.isCleaning).toBe(true);
-    });
-  });
-
-  describe('Temperature Sensor', () => {
-    it('should return current temperature', () => {
-      mockDevice._setState({ waterTemperature: 28.5 });
-
-      const state = mockDevice.getState();
-
-      expect(state.waterTemperature).toBe(28.5);
-    });
-
-    it('should handle undefined temperature', () => {
-      mockDevice._setState({ waterTemperature: undefined });
-
-      const state = mockDevice.getState();
-
-      expect(state.waterTemperature).toBeUndefined();
-    });
-  });
-
-  describe('Filter Maintenance', () => {
-    it('should return filter OK status', () => {
-      mockDevice._setState({ filterStatus: 'ok' });
-
-      const state = mockDevice.getState();
-
-      expect(state.filterStatus).toBe('ok');
-    });
-
-    it('should return filter needs cleaning status', () => {
-      mockDevice._setState({ filterStatus: 'needs_cleaning' });
-
-      const state = mockDevice.getState();
-
-      expect(state.filterStatus).toBe('needs_cleaning');
-    });
-  });
-
-  describe('Cleaning Control', () => {
-    it('should start cleaning when set to on', async () => {
-      const result = await mockDevice.startCleaning();
-
-      expect(result).toBe(true);
-      expect(mockDevice.startCleaning).toHaveBeenCalled();
-    });
-
-    it('should stop cleaning when set to off', async () => {
-      const result = await mockDevice.stopCleaning();
-
-      expect(result).toBe(true);
-      expect(mockDevice.stopCleaning).toHaveBeenCalled();
-    });
-
-    it('should handle start cleaning failure', async () => {
-      mockDevice.startCleaning.mockResolvedValue(false);
-
-      const result = await mockDevice.startCleaning();
-
-      expect(result).toBe(false);
-    });
-  });
-
-  describe('State Updates', () => {
-    it('should emit stateChange when state changes', () => {
-      const stateHandler = vi.fn();
-      mockDevice.on('stateChange', stateHandler);
-
-      mockDevice._setState({ isCleaning: true });
-
-      expect(stateHandler).toHaveBeenCalledWith(
-        expect.objectContaining({ isCleaning: true }),
-      );
-    });
-
-    it('should update switch characteristic on state change', () => {
-      const stateHandler = vi.fn();
-      mockDevice.on('stateChange', stateHandler);
-
-      mockDevice._setState({ isCleaning: true });
-
-      expect(stateHandler).toHaveBeenCalled();
-    });
-
-    it('should update temperature on state change', () => {
-      const stateHandler = vi.fn();
-      mockDevice.on('stateChange', stateHandler);
-
-      mockDevice._setState({ waterTemperature: 26.0 });
-
-      const state = mockDevice.getState();
-      expect(state.waterTemperature).toBe(26.0);
-    });
-
-    it('should update filter status on state change', () => {
-      const stateHandler = vi.fn();
-      mockDevice.on('stateChange', stateHandler);
-
-      mockDevice._setState({ filterStatus: 'needs_cleaning' });
-
-      const state = mockDevice.getState();
-      expect(state.filterStatus).toBe('needs_cleaning');
-    });
-  });
-
-  describe('Error Handling', () => {
-    it('should handle device errors', () => {
-      const errorHandler = vi.fn();
-      mockDevice.on('error', errorHandler);
-
-      mockDevice._emitError(new Error('Test error'));
-
-      expect(errorHandler).toHaveBeenCalled();
-    });
-
-    it('should report fault status when error present', () => {
-      mockDevice._setState({
-        hasError: true,
-        errorCode: 2,
-        errorMessage: 'Robot out of water',
-      });
-
-      const state = mockDevice.getState();
-
-      expect(state.hasError).toBe(true);
-      expect(state.errorCode).toBe(2);
-    });
-
-    it('should clear fault status when no error', () => {
-      mockDevice._setState({
-        hasError: false,
-        errorCode: 0,
-        errorMessage: undefined,
-      });
-
-      const state = mockDevice.getState();
-
-      expect(state.hasError).toBe(false);
-    });
-  });
-
-  describe('Accessory Information', () => {
-    it('should set manufacturer', () => {
-      const infoService = mockAccessory.getService(MockServices.AccessoryInformation);
-
-      if (infoService) {
-        infoService.setCharacteristic(MockCharacteristics.Manufacturer, 'Maytronics');
-
-        expect(infoService.setCharacteristic).toHaveBeenCalledWith(
-          MockCharacteristics.Manufacturer,
-          'Maytronics',
-        );
-      }
-    });
-
-    it('should set model', () => {
-      const infoService = mockAccessory.getService(MockServices.AccessoryInformation);
-
-      if (infoService) {
-        infoService.setCharacteristic(MockCharacteristics.Model, 'Dolphin M400');
-
-        expect(infoService.setCharacteristic).toHaveBeenCalledWith(
-          MockCharacteristics.Model,
-          'Dolphin M400',
-        );
-      }
-    });
-
-    it('should set serial number', () => {
-      const infoService = mockAccessory.getService(MockServices.AccessoryInformation);
-
-      if (infoService) {
-        infoService.setCharacteristic(MockCharacteristics.SerialNumber, 'E3086OFG2M');
-
-        expect(infoService.setCharacteristic).toHaveBeenCalledWith(
-          MockCharacteristics.SerialNumber,
-          'E3086OFG2M',
-        );
-      }
-    });
-  });
-});
-
-describe('DolphinAccessory - Edge Cases', () => {
-  let mockDevice: MockDolphinDevice;
-
-  beforeEach(() => {
-    mockDevice = new MockDolphinDevice();
-  });
-
-  afterEach(() => {
-    mockDevice.removeAllListeners();
-  });
-
-  it('should handle rapid state changes', () => {
-    const stateHandler = vi.fn();
-    mockDevice.on('stateChange', stateHandler);
-
-    // Rapid state changes
-    mockDevice._setState({ isCleaning: true });
-    mockDevice._setState({ isCleaning: false });
-    mockDevice._setState({ isCleaning: true });
-
-    expect(stateHandler).toHaveBeenCalledTimes(3);
-  });
-
-  it('should handle temperature edge values', () => {
-    mockDevice._setState({ waterTemperature: 0 });
-    expect(mockDevice.getState().waterTemperature).toBe(0);
-
-    mockDevice._setState({ waterTemperature: 50 });
-    expect(mockDevice.getState().waterTemperature).toBe(50);
-  });
-
-  it('should handle undefined values gracefully', () => {
-    mockDevice._setState({
-      waterTemperature: undefined,
-      cycleTimeRemaining: 0,
-      cycleStartTime: undefined,
-    });
-
-    const state = mockDevice.getState();
-
-    expect(state.waterTemperature).toBeUndefined();
-    expect(state.cycleStartTime).toBeUndefined();
-  });
-});
-
-describe('DolphinAccessory - Multiple Devices', () => {
-  it('should support multiple device instances', () => {
-    const device1 = new MockDolphinDevice();
-    const device2 = new MockDolphinDevice();
-
-    device1.serialNumber = 'SERIAL001';
-    device2.serialNumber = 'SERIAL002';
-
-    expect(device1.serialNumber).not.toBe(device2.serialNumber);
-
-    device1._setState({ isCleaning: true });
-    device2._setState({ isCleaning: false });
-
-    expect(device1.getState().isCleaning).toBe(true);
-    expect(device2.getState().isCleaning).toBe(false);
-  });
-});
-
-describe('DolphinAccessory - command results', () => {
   let mockLogger: ReturnType<typeof createMockLogger>;
   let mockAccessory: ReturnType<typeof createMockPlatformAccessory>;
 
-  const createDevice = (overrides: Record<string, unknown>) =>
-    Object.assign(new EventEmitter(), {
+  const createDevice = (overrides: Record<string, unknown> = {}) => {
+    const state = { ...createDefaultState(), connected: true, temperature: 24 as number | undefined };
+    return Object.assign(new EventEmitter(), {
       serialNumber: 'E3086OFG2M',
       name: 'Dolphin M400',
       modelName: 'Dolphin M400',
       features: { hasTemperatureSensor: true },
-      getState: vi.fn(() => ({ isCleaning: false, temperature: 20, filterStatus: 'ok' })),
+      state,
+      getState: vi.fn(() => ({ ...state })),
       startCleaning: vi.fn().mockResolvedValue(true),
       stopCleaning: vi.fn().mockResolvedValue(true),
       ...overrides,
     });
+  };
 
-  const createAccessory = async (device: unknown) => {
-    const { DolphinAccessory } = await import('../../src/accessories/dolphinAccessory.js');
+  const createAccessory = (device: unknown, deviceConfig?: DeviceConfig) => {
     const platform = {
       // Valve is only looked up to migrate away from it
       Service: { ...MockServices, Valve: { name: 'Valve', UUID: 'mock-service-uuid-Valve' } },
-      Characteristic: { ...MockCharacteristics, ConfiguredName: { name: 'ConfiguredName', UUID: 'mock-uuid-ConfiguredName' } },
+      Characteristic: {
+        ...MockCharacteristics,
+        FilterChangeIndication,
+        ConfiguredName: { name: 'ConfiguredName', UUID: 'mock-uuid-ConfiguredName' },
+      },
+      homebridgeApi: { hap: { HapStatusError: MockHapStatusError } },
       log: mockLogger,
     };
-    return new DolphinAccessory(platform as never, mockAccessory, device as never, undefined);
+    return new DolphinAccessory(platform as never, mockAccessory, device as never, deviceConfig);
   };
 
-  const switchOn = () =>
-    mockAccessory.getService(MockServices.Switch as never)!.getCharacteristic(MockCharacteristics.On as never);
+  const characteristic = (service: { name: string }, char: { name: string }) =>
+    mockAccessory.getService(service as never)!.getCharacteristic(char as never);
 
   beforeEach(() => {
     mockLogger = createMockLogger();
     mockAccessory = createMockPlatformAccessory('Dolphin M400', 'test-uuid-123');
   });
 
-  it('should revert the switch when the cloud does not accept the command', async () => {
-    const device = createDevice({ startCleaning: vi.fn().mockResolvedValue(false) });
-    const accessory = await createAccessory(device);
+  describe('services', () => {
+    it('should expose a switch, a temperature sensor and a filter indicator by default', () => {
+      createAccessory(createDevice());
 
-    await (accessory as any).setOn(true);
+      expect(mockAccessory.getService(MockServices.Switch as never)).toBeDefined();
+      expect(mockAccessory.getService(MockServices.TemperatureSensor as never)).toBeDefined();
+      expect(mockAccessory.getService(MockServices.FilterMaintenance as never)).toBeDefined();
+    });
 
-    expect(device.startCleaning).toHaveBeenCalled();
-    expect(switchOn().value).toBe(false);
-    expect(mockLogger.warn).toHaveBeenCalledWith(expect.stringContaining('did not accept the start command'));
+    it('should remove sensors that were disabled in the config', () => {
+      createAccessory(createDevice());
+      createAccessory(createDevice(), { enableTemperature: false, enableFilterStatus: false });
+
+      expect(mockAccessory.getService(MockServices.TemperatureSensor as never)).toBeUndefined();
+      expect(mockAccessory.getService(MockServices.FilterMaintenance as never)).toBeUndefined();
+    });
+
+    it('should skip the temperature sensor on robots without one', () => {
+      createAccessory(createDevice({ features: { hasTemperatureSensor: false } }));
+
+      expect(mockAccessory.getService(MockServices.TemperatureSensor as never)).toBeUndefined();
+    });
   });
 
-  it('should leave the switch on when the command is accepted', async () => {
-    const device = createDevice({});
-    const accessory = await createAccessory(device);
+  describe('temperature', () => {
+    it('should report the current reading and remember it', async () => {
+      const accessory = createAccessory(createDevice());
+      accessory.handleStateChange({ ...createDefaultState(), temperature: 26 });
 
-    await (accessory as any).setOn(true);
+      await expect(accessory.getTemperature()).resolves.toBe(24);
+      expect(mockAccessory.context.lastTemperature).toBe(26);
+    });
 
-    expect(switchOn().value).toBe(true);
-    expect(mockLogger.warn).not.toHaveBeenCalled();
+    it('should fall back to the last known reading', async () => {
+      mockAccessory.context.lastTemperature = 22.5;
+      const device = createDevice();
+      device.state.temperature = undefined;
+
+      await expect(createAccessory(device).getTemperature()).resolves.toBe(22.5);
+    });
+
+    it('should report an error rather than invent a temperature', async () => {
+      const device = createDevice();
+      device.state.temperature = undefined;
+
+      await expect(createAccessory(device).getTemperature()).rejects.toMatchObject({ hapStatus: -70402 });
+    });
+  });
+
+  describe('state changes', () => {
+    it('should update the switch and the filter indicator', () => {
+      const device = createDevice();
+      createAccessory(device);
+
+      device.emit('stateChange', { ...createDefaultState(), isCleaning: true, filterStatus: 'needs_cleaning' });
+
+      expect(characteristic(MockServices.Switch, MockCharacteristics.On).value).toBe(true);
+      expect(characteristic(MockServices.FilterMaintenance, FilterChangeIndication).value).toBe(1);
+    });
+
+    it('should not flip the switch back during the grace period after a command', async () => {
+      const device = createDevice();
+      const accessory = createAccessory(device);
+
+      await accessory.setOn(true);
+      // A stale shadow arrives before the robot has reported the start
+      device.emit('stateChange', { ...createDefaultState(), isCleaning: false });
+
+      expect(characteristic(MockServices.Switch, MockCharacteristics.On).value).toBe(true);
+    });
+
+    it('should stop listening to the device once disposed', () => {
+      const device = createDevice();
+      createAccessory(device).dispose();
+
+      expect(device.listenerCount('stateChange')).toBe(0);
+      expect(device.listenerCount('disconnect')).toBe(0);
+    });
+  });
+
+  describe('commands', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('should start in the configured mode', async () => {
+      const device = createDevice();
+
+      await createAccessory(device, { cleaningMode: 'floor' }).setOn(true);
+
+      expect(device.startCleaning).toHaveBeenCalledWith('floor');
+    });
+
+    it('should start in "all" mode when none is configured', async () => {
+      const device = createDevice();
+
+      await createAccessory(device).setOn(true);
+
+      expect(device.startCleaning).toHaveBeenCalledWith('all');
+    });
+
+    it('should not send a command when the robot is already in the requested state', async () => {
+      const device = createDevice();
+
+      await createAccessory(device).setOn(false);
+
+      expect(device.stopCleaning).not.toHaveBeenCalled();
+    });
+
+    it('should revert the switch when the cloud does not accept the command', async () => {
+      const device = createDevice({ startCleaning: vi.fn().mockResolvedValue(false) });
+
+      await createAccessory(device).setOn(true);
+
+      expect(characteristic(MockServices.Switch, MockCharacteristics.On).value).toBe(false);
+      expect(mockLogger.warn).toHaveBeenCalledWith(expect.stringContaining('did not accept the start command'));
+    });
+
+    it('should revert the switch when the command throws', async () => {
+      const device = createDevice({ startCleaning: vi.fn().mockRejectedValue(new Error('boom')) });
+
+      await createAccessory(device).setOn(true);
+
+      expect(characteristic(MockServices.Switch, MockCharacteristics.On).value).toBe(false);
+      expect(mockLogger.error).toHaveBeenCalled();
+    });
+
+    it('should leave the switch on when the command is accepted', async () => {
+      const device = createDevice();
+
+      await createAccessory(device).setOn(true);
+
+      expect(characteristic(MockServices.Switch, MockCharacteristics.On).value).toBe(true);
+      expect(mockLogger.warn).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('filter status', () => {
+    it('should map the device filter status to HomeKit', async () => {
+      const device = createDevice();
+      const accessory = createAccessory(device);
+
+      await expect(accessory.getFilterStatus()).resolves.toBe(0);
+      device.state.filterStatus = 'needs_cleaning';
+      await expect(accessory.getFilterStatus()).resolves.toBe(1);
+    });
   });
 });

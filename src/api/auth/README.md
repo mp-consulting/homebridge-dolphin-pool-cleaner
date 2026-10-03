@@ -18,13 +18,12 @@ Stores and manages authentication credentials.
 
 - `CredentialManager` class: Credential storage and validation
 - Tracks token expiration times
-- Provides `needsRefresh()` and `hasValidCredentials()` checks
+- Provides the `needsRefresh()` check
 - Stores Cognito tokens, AWS credentials, and robot info
 
 ### `types.ts`
 TypeScript interfaces for authentication data structures.
 
-- `CognitoCredentials`: ID/access/refresh tokens
 - `AWSIoTCredentials`: AWS access key, secret, session token
 - `MyDolphinTokens`: Maytronics-specific tokens
 - `LoginResult`: Authentication result with robot info

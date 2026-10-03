@@ -10,7 +10,8 @@ Main device class representing a single robot.
 - `DolphinDevice` class: State management and control interface
 - Polls AWS IoT Thing Shadow for state updates
 - Emits `stateChange` and `disconnect` events
-- Provides control methods: `startCleaning()`, `stopCleaning()`, `setCleaningMode()`, `pickup()`
+- Provides control methods: `startCleaning()`, `stopCleaning()`, `setCleaningMode()`
+- Skips the set-mode request when the robot already reports that mode for its next cycle
 - Applies device-specific features (e.g., temperature sensor availability)
 
 ### `deviceCatalog.ts`

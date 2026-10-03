@@ -54,10 +54,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-cognito-identity-provider": "^3.1127.0",
-    "@aws-sdk/client-iot": "^3.1127.0",
     "@homebridge/plugin-ui-utils": "^2.2.6",
-    "axios": "^1.20.0",
-    "class-validator": "^0.15.1",
     "mqtt": "^5.15.2"
   },
   "devDependencies": {

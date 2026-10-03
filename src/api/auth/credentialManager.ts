@@ -4,7 +4,7 @@
  * Manages authentication credentials, including storage, refresh, and expiration tracking.
  */
 import { CREDENTIAL_REFRESH_BUFFER_MS } from '../../config/constants.js';
-import type { AWSIoTCredentials, AuthState, MyDolphinAuthResult } from './types.js';
+import type { AWSIoTCredentials, MyDolphinAuthResult } from './types.js';
 
 /**
  * Manages authentication credentials lifecycle
@@ -93,74 +93,5 @@ export class CredentialManager {
 
     const refreshTime = new Date(Date.now() + CREDENTIAL_REFRESH_BUFFER_MS);
     return this.awsCredentials.expiration < refreshTime;
-  }
-
-  /**
-   * Check if we have valid AWS credentials (not expired)
-   */
-  hasValidCredentials(): boolean {
-    if (!this.awsCredentials) {
-      return false;
-    }
-
-    return this.awsCredentials.expiration > new Date();
-  }
-
-  /**
-   * Check if fully authenticated
-   */
-  isAuthenticated(): boolean {
-    return !!(
-      this.cognitoToken &&
-      this.mobToken &&
-      this.awsCredentials &&
-      this.serialNumber &&
-      this.hasValidCredentials()
-    );
-  }
-
-  /**
-   * Get current authentication state
-   */
-  getState(): AuthState {
-    return {
-      cognitoToken: this.cognitoToken,
-      mobToken: this.mobToken,
-      awsCredentials: this.awsCredentials,
-      serialNumber: this.serialNumber,
-      robotName: this.robotName,
-      deviceType: this.deviceType,
-      isAuthenticated: this.isAuthenticated(),
-    };
-  }
-
-  /**
-   * Clear all credentials
-   */
-  clear(): void {
-    this.cognitoToken = undefined;
-    this.mobToken = undefined;
-    this.awsCredentials = undefined;
-    this.serialNumber = undefined;
-    this.robotName = undefined;
-    this.deviceType = undefined;
-  }
-
-  /**
-   * Get time until credentials expire
-   */
-  getTimeUntilExpiration(): number {
-    if (!this.awsCredentials) {
-      return 0;
-    }
-
-    return Math.max(0, this.awsCredentials.expiration.getTime() - Date.now());
-  }
-
-  /**
-   * Get credentials expiration date
-   */
-  getExpirationDate(): Date | undefined {
-    return this.awsCredentials?.expiration;
   }
 }

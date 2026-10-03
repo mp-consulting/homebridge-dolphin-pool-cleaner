@@ -36,7 +36,7 @@ Barrel export for all constants.
 
 | Mode | Description | API Mode |
 |------|-------------|----------|
-| `all` | Full pool cleaning | `regular` |
+| `all` | Full pool cleaning (config alias: `regular`) | `all` |
 | `floor` | Floor only | `floor` |
 | `wall` | Walls only | `wall` |
 | `water` | Waterline | `water` |

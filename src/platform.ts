@@ -17,11 +17,14 @@ import {
   PLATFORM_NAME,
   DEFAULT_POLLING_INTERVAL,
   MIN_POLLING_INTERVAL,
+  DISCOVERY_RETRY_BASE_DELAY_MS,
+  DISCOVERY_RETRY_MAX_DELAY_MS,
 } from './config/constants.js';
 import { MaytronicsAPI, type RobotInfo } from './api/maytronicsApi.js';
 import { DolphinDevice } from './devices/dolphinDevice.js';
 import { DolphinAccessory } from './accessories/dolphinAccessory.js';
-import { getErrorMessage } from './utils/errors.js';
+import { AuthError, ErrorCode, getErrorMessage } from './utils/errors.js';
+import { unrefTimer } from './utils/timers.js';
 
 export interface DeviceConfig {
   serialNumber?: string;
@@ -55,6 +58,10 @@ export class DolphinPoolCleanerPlatform implements DynamicPlatformPlugin {
   private readonly devices: Map<string, DolphinDevice> = new Map();
   // Config
   private readonly config: DolphinPlatformConfig;
+  // Discovery retry state
+  private discoveryAttempts = 0;
+  private discoveryRetryTimer?: ReturnType<typeof setTimeout>;
+  private shuttingDown = false;
 
   constructor(log: Logger, config: PlatformConfig, homebridgeApi: API) {
     this.log = log;
@@ -76,8 +83,29 @@ export class DolphinPoolCleanerPlatform implements DynamicPlatformPlugin {
     // Wait for Homebridge to finish launching
     this.homebridgeApi.on('didFinishLaunching', () => {
       this.log.debug('Homebridge finished launching');
-      this.discoverDevices();
+      void this.discoverDevices();
     });
+    this.homebridgeApi.on('shutdown', () => this.shutdown());
+  }
+
+  /**
+   * Stop polling, pending retries and the MQTT connection
+   */
+  shutdown(): void {
+    this.shuttingDown = true;
+    if (this.discoveryRetryTimer) {
+      clearTimeout(this.discoveryRetryTimer);
+      this.discoveryRetryTimer = undefined;
+    }
+    this.stopDevices();
+    this.api?.disconnect();
+  }
+
+  private stopDevices(): void {
+    for (const device of this.devices.values()) {
+      device.stop();
+    }
+    this.devices.clear();
   }
   /**
    * Called when homebridge restores cached accessories from disk at startup.
@@ -104,16 +132,49 @@ export class DolphinPoolCleanerPlatform implements DynamicPlatformPlugin {
       }
 
       this.removeStaleAccessories(robots);
+      this.discoveryAttempts = 0;
       this.log.info(`Discovered ${robots.length} robot(s)`);
     } catch (error) {
       this.log.error('Failed to discover devices:', getErrorMessage(error));
+      this.scheduleDiscoveryRetry(error);
     }
+  }
+
+  /**
+   * Retry discovery with exponential backoff, so a cloud or network outage at
+   * startup does not leave the accessories dead until Homebridge restarts.
+   * Bad credentials will not fix themselves, so those are not retried.
+   */
+  private scheduleDiscoveryRetry(error: unknown): void {
+    if (this.shuttingDown) {
+      return;
+    }
+    if (error instanceof AuthError &&
+      (error.code === ErrorCode.AUTH_INVALID_CREDENTIALS || error.code === ErrorCode.AUTH_TOKEN_EXPIRED)) {
+      this.log.error('Not retrying: update the account in the plugin settings and restart Homebridge');
+      return;
+    }
+
+    const delayMs = Math.min(
+      DISCOVERY_RETRY_BASE_DELAY_MS * 2 ** this.discoveryAttempts,
+      DISCOVERY_RETRY_MAX_DELAY_MS,
+    );
+    this.discoveryAttempts++;
+    this.log.info(`Retrying discovery in ${Math.round(delayMs / 1000)}s`);
+    this.discoveryRetryTimer = unrefTimer(setTimeout(() => {
+      this.discoveryRetryTimer = undefined;
+      void this.discoverDevices();
+    }, delayMs));
   }
 
   /**
    * Initialize API client and return robot list
    */
   private async initializeApi(): Promise<RobotInfo[]> {
+    // A retry starts from a clean slate
+    this.stopDevices();
+    this.api?.disconnect();
+
     this.api = new MaytronicsAPI(
       this.config.email,
       this.config.password,
@@ -158,6 +219,7 @@ export class DolphinPoolCleanerPlatform implements DynamicPlatformPlugin {
       this.log.info('Restoring existing accessory:', existingAccessory.displayName);
       existingAccessory.context.device = robotInfo;
       existingAccessory.context.deviceConfig = deviceConfig;
+      this.accessoryHandlers.get(serialNumber)?.dispose();
       const handler = new DolphinAccessory(this, existingAccessory, device, deviceConfig);
       this.accessoryHandlers.set(serialNumber, handler);
       this.homebridgeApi.updatePlatformAccessories([existingAccessory]);

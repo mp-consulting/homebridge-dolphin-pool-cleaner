@@ -5,60 +5,82 @@
  * 1. AWS Cognito authentication (user/password or refresh token)
  * 2. MyDolphin backend authentication
  * 3. AWS IoT temporary credentials acquisition
+ *
+ * The IoT endpoint is fixed per region (it belongs to the MyDolphin AWS
+ * account), so it comes from IOT_ENDPOINTS rather than a DescribeEndpoint call.
  */
-import axios, { type AxiosInstance } from 'axios';
 import {
   CognitoIdentityProviderClient,
   InitiateAuthCommand,
   AuthFlowType,
 } from '@aws-sdk/client-cognito-identity-provider';
-import { IoTClient, DescribeEndpointCommand } from '@aws-sdk/client-iot';
 import type { Logger } from 'homebridge';
 import {
-  MAYTRONICS_API,
   COGNITO,
   IOT_ENDPOINTS,
   DEFAULT_IOT_REGION,
-  API_TIMEOUT_MS,
 } from '../../config/constants.js';
+import { MyDolphinHttpClient } from '../httpClient.js';
 import { AuthError, ErrorCode, getErrorMessage } from '../../utils/errors.js';
 import { CredentialManager } from './credentialManager.js';
 import type { AuthConfig, AWSIoTCredentials, LoginResult } from './types.js';
+
+interface MyDolphinUserData {
+  mob_token: string;
+  Sernum: string;
+  MyRobotName: string;
+  connectVia: string;
+}
+
+interface AwsTokenData {
+  AccessKeyId: string;
+  SecretAccessKey: string;
+  Token: string;
+  TokenExpiration: string;
+}
 
 /**
  * Manages the complete authentication flow for MyDolphin Plus
  */
 export class AuthenticationManager {
   private readonly log: Logger;
-  private readonly httpClient: AxiosInstance;
+  private readonly httpClient: MyDolphinHttpClient;
   private readonly credentials: CredentialManager;
   private readonly config: AuthConfig;
-  private iotRegion: string;
-  private iotEndpoint: string;
+  private readonly iotRegion: string;
+  private readonly iotEndpoint: string;
+  private readonly cognitoClient: CognitoIdentityProviderClient;
+  private pendingLogin?: Promise<LoginResult>;
 
   constructor(config: AuthConfig, log: Logger) {
     this.log = log;
     this.config = config;
     this.credentials = new CredentialManager();
-    this.iotRegion = config.iotRegion || DEFAULT_IOT_REGION;
-    this.iotEndpoint = IOT_ENDPOINTS[this.iotRegion] || IOT_ENDPOINTS['eu-west-1'];
+    const region = config.iotRegion && Object.hasOwn(IOT_ENDPOINTS, config.iotRegion)
+      ? config.iotRegion
+      : DEFAULT_IOT_REGION;
+    if (config.iotRegion && region !== config.iotRegion) {
+      log.warn(`Unknown IoT region "${config.iotRegion}", using ${DEFAULT_IOT_REGION}`);
+    }
+    // Endpoint and signing region must match, so both come from the same entry
+    this.iotRegion = region;
+    this.iotEndpoint = IOT_ENDPOINTS[region];
 
-    this.httpClient = axios.create({
-      baseURL: MAYTRONICS_API.BASE_URL,
-      timeout: API_TIMEOUT_MS,
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        AppKey: MAYTRONICS_API.APP_KEY,
-        Accept: '*/*',
-        'User-Agent': MAYTRONICS_API.USER_AGENT,
-      },
-    });
+    this.httpClient = new MyDolphinHttpClient();
+    this.cognitoClient = new CognitoIdentityProviderClient({ region: COGNITO.REGION });
   }
 
   /**
-   * Complete authentication flow
+   * Complete authentication flow. Concurrent callers share a single login.
    */
-  async login(): Promise<LoginResult> {
+  login(): Promise<LoginResult> {
+    this.pendingLogin ??= this.performLogin().finally(() => {
+      this.pendingLogin = undefined;
+    });
+    return this.pendingLogin;
+  }
+
+  private async performLogin(): Promise<LoginResult> {
     try {
       this.log.debug('Starting authentication flow...');
 
@@ -103,9 +125,7 @@ export class AuthenticationManager {
    * Step 1: Authenticate with AWS Cognito
    */
   private async authenticateWithCognito(): Promise<void> {
-    const cognitoClient = new CognitoIdentityProviderClient({
-      region: COGNITO.REGION,
-    });
+    const cognitoClient = this.cognitoClient;
 
     try {
       let idToken: string | undefined;
@@ -182,7 +202,7 @@ export class AuthenticationManager {
         }
       }
 
-      this.log.error('Cognito authentication failed:', error);
+      this.log.error('Cognito authentication failed:', getErrorMessage(error));
       throw new AuthError(
         ErrorCode.AUTH_COGNITO_FAILED,
         'Failed to authenticate with AWS Cognito',
@@ -196,24 +216,20 @@ export class AuthenticationManager {
    */
   private async authenticateWithMyDolphin(): Promise<void> {
     try {
-      const response = await this.httpClient.post(
+      const response = await this.httpClient.post<MyDolphinUserData>(
         '/mobapi/user/authenticate-user/',
-        null,
-        {
-          headers: {
-            Authorization: `Bearer ${this.credentials.getCognitoToken()}`,
-          },
-        },
+        undefined,
+        { bearerToken: this.credentials.getCognitoToken() },
       );
 
-      if (response.data.Status !== '1') {
+      const data = response.Data;
+      if (response.Status !== '1' || !data) {
         throw new AuthError(
           ErrorCode.AUTH_MYDOLPHIN_FAILED,
-          'Authentication failed: ' + (response.data.Alert || 'Unknown error'),
+          'Authentication failed: ' + (response.Alert || 'Unknown error'),
         );
       }
 
-      const data = response.data.Data;
       this.credentials.setMyDolphinAuth({
         mobToken: data.mob_token,
         serialNumber: data.Sernum,
@@ -230,13 +246,7 @@ export class AuthenticationManager {
         throw error;
       }
 
-      if (axios.isAxiosError(error)) {
-        this.log.error(
-          'MyDolphin API error:',
-          error.response?.data || error.message,
-        );
-      }
-
+      this.log.error('MyDolphin API error:', getErrorMessage(error));
       throw new AuthError(
         ErrorCode.AUTH_MYDOLPHIN_FAILED,
         'Failed to authenticate with MyDolphin backend',
@@ -250,30 +260,24 @@ export class AuthenticationManager {
    */
   private async getAWSCredentials(): Promise<void> {
     try {
-      const response = await this.httpClient.get('/mt-sso/aws/getToken/', {
+      const response = await this.httpClient.get<AwsTokenData>('/mt-sso/aws/getToken/', {
         params: {
           sernum: this.credentials.getSerialNumber(),
           device_type: this.credentials.getDeviceType()?.toString(),
         },
-        headers: {
-          Authorization: `Bearer ${this.credentials.getCognitoToken()}`,
-        },
+        bearerToken: this.credentials.getCognitoToken(),
       });
 
-      this.log.debug(
-        'AWS credentials response received, status:',
-        response.data.Status,
-      );
+      this.log.debug('AWS credentials response received, status:', response.Status);
 
-      if (response.data.Status !== '1') {
+      const data = response.Data;
+      if (response.Status !== '1' || !data) {
         throw new AuthError(
           ErrorCode.AUTH_AWS_CREDENTIALS_FAILED,
-          'Failed to get AWS credentials: ' +
-            (response.data.Alert || 'Unknown error'),
+          'Failed to get AWS credentials: ' + (response.Alert || 'Unknown error'),
         );
       }
 
-      const data = response.data.Data;
       const awsCredentials: AWSIoTCredentials = {
         accessKeyId: data.AccessKeyId,
         secretAccessKey: data.SecretAccessKey,
@@ -286,61 +290,17 @@ export class AuthenticationManager {
       this.log.debug(
         `AWS credentials obtained, expire at: ${awsCredentials.expiration.toISOString()}`,
       );
-
-      // Discover the IoT endpoint dynamically
-      await this.discoverIoTEndpoint(awsCredentials);
     } catch (error) {
       if (error instanceof AuthError) {
         throw error;
       }
 
-      if (axios.isAxiosError(error)) {
-        this.log.error(
-          'AWS credentials error:',
-          error.response?.data || error.message,
-        );
-      }
-
+      this.log.error('AWS credentials error:', getErrorMessage(error));
       throw new AuthError(
         ErrorCode.AUTH_AWS_CREDENTIALS_FAILED,
         'Failed to get AWS IoT credentials',
         { cause: error },
       );
-    }
-  }
-
-  /**
-   * Discover the IoT endpoint using AWS IoT DescribeEndpoint API
-   */
-  private async discoverIoTEndpoint(credentials: AWSIoTCredentials): Promise<void> {
-    try {
-      const iotClient = new IoTClient({
-        region: this.iotRegion,
-        credentials: {
-          accessKeyId: credentials.accessKeyId,
-          secretAccessKey: credentials.secretAccessKey,
-          sessionToken: credentials.sessionToken,
-        },
-      });
-
-      const command = new DescribeEndpointCommand({
-        endpointType: 'iot:Data-ATS',
-      });
-
-      const response = await iotClient.send(command);
-
-      if (response.endpointAddress) {
-        this.iotEndpoint = response.endpointAddress;
-        this.log.debug(`Discovered IoT endpoint: ${this.iotEndpoint}`);
-      } else {
-        this.log.warn('Could not discover IoT endpoint, using default');
-      }
-    } catch (error) {
-      const err = error as Error;
-      this.log.debug(
-        `Failed to discover IoT endpoint: ${err.message}. Using default.`,
-      );
-      // Keep using the configured/default endpoint
     }
   }
 
@@ -352,13 +312,6 @@ export class AuthenticationManager {
       this.log.debug('Credentials expired or expiring soon, refreshing...');
       await this.login();
     }
-  }
-
-  /**
-   * Check if credentials need refresh
-   */
-  needsRefresh(): boolean {
-    return this.credentials.needsRefresh();
   }
 
   /**
@@ -385,7 +338,7 @@ export class AuthenticationManager {
   /**
    * Get HTTP client for additional API calls
    */
-  getHttpClient(): AxiosInstance {
+  getHttpClient(): MyDolphinHttpClient {
     return this.httpClient;
   }
 }

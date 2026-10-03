@@ -5,15 +5,16 @@
  * Supports OTP/MFA verification flow.
  */
 import { createRequire } from 'module';
+import { COGNITO, MAYTRONICS_API } from '../dist/config/constants.js';
 
 const require = createRequire(import.meta.url);
 const { HomebridgePluginUiServer } = require('@homebridge/plugin-ui-utils');
 
-// Configuration constants
-const COGNITO_REGION = 'us-west-2';
-const COGNITO_CLIENT_ID = '4ed12eq01o6n0tl5f0sqmkq2na';
-const MAYTRONICS_BASE_URL = 'https://apps.maytronics.com';
-const APP_KEY = '346BDE92-53D1-4829-8A2E-B496014B586C';
+// Shared with the plugin, so the two never drift apart
+const COGNITO_REGION = COGNITO.REGION;
+const COGNITO_CLIENT_ID = COGNITO.CLIENT_ID;
+const MAYTRONICS_BASE_URL = MAYTRONICS_API.BASE_URL;
+const APP_KEY = MAYTRONICS_API.APP_KEY;
 const REQUEST_TIMEOUT = 30000;
 const SESSION_TTL_MS = 5 * 60 * 1000; // 5 minutes - Cognito sessions expire quickly
 
@@ -237,7 +238,7 @@ class MyDolphinService {
     const response = await HttpClient.maytronicsRequest(
       '/mobapi/serial-numbers/getRobotDetailsByRobotSN/',
       idToken,
-      `SERNUM=${serialNumber}`,
+      new URLSearchParams({ SERNUM: serialNumber }).toString(),
     );
 
     if (response.Status !== '1') {
@@ -272,8 +273,6 @@ class DolphinUiServer extends HomebridgePluginUiServer {
     // Register request handlers
     this.onRequest('/authenticate', this.handleAuthenticate.bind(this));
     this.onRequest('/verify-otp', this.handleVerifyOtp.bind(this));
-    this.onRequest('/get-robots', this.handleGetRobots.bind(this));
-    this.onRequest('/test-connection', this.handleTestConnection.bind(this));
 
     this.ready();
   }
@@ -288,6 +287,8 @@ class DolphinUiServer extends HomebridgePluginUiServer {
     if (!email) {
       return { success: false, error: 'Email is required' };
     }
+
+    this.cleanExpiredSessions();
 
     try {
       // Step 1: Initiate Cognito auth
@@ -357,10 +358,9 @@ class DolphinUiServer extends HomebridgePluginUiServer {
       // Complete authentication with MyDolphin
       const result = await this.completeAuthentication(cognitoResult);
 
-      // Include tokens for plugin storage
+      // Only the refresh token is stored by the plugin; the short-lived ID and
+      // access tokens never need to leave the server
       if (result.success) {
-        result.idToken = cognitoResult.idToken;
-        result.accessToken = cognitoResult.accessToken;
         result.refreshToken = cognitoResult.refreshToken;
       }
 
@@ -405,26 +405,6 @@ class DolphinUiServer extends HomebridgePluginUiServer {
   }
 
   /**
-   * Get robot list for authenticated user
-   */
-  async handleGetRobots(payload) {
-    const authResult = await this.handleAuthenticate(payload);
-
-    if (!authResult.success) {
-      return authResult;
-    }
-
-    return {
-      success: true,
-      robots: [{
-        serialNumber: authResult.serialNumber,
-        name: authResult.robotName,
-        deviceType: authResult.deviceType,
-      }],
-    };
-  }
-
-  /**
    * Remove expired sessions from the pending sessions map
    */
   cleanExpiredSessions() {
@@ -434,22 +414,6 @@ class DolphinUiServer extends HomebridgePluginUiServer {
         this.pendingSessions.delete(email);
       }
     }
-  }
-
-  /**
-   * Test connection to MyDolphin service
-   */
-  async handleTestConnection(payload) {
-    const result = await this.handleAuthenticate(payload);
-
-    if (result.success) {
-      return {
-        success: true,
-        message: `Connected! Found robot: ${result.robotName} (S/N: ${result.serialNumber})`,
-      };
-    }
-
-    return result;
   }
 }
 

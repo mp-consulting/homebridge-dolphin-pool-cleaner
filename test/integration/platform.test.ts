@@ -1,359 +1,227 @@
 /**
  * Integration tests for DolphinPoolCleanerPlatform
+ *
+ * The cloud client is replaced by a fake; devices and accessories are real.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { EventEmitter } from 'events';
 import {
   createMockLogger,
   createMockAPI,
-  createMockAxios,
-  mockMaytronicsResponses,
-  mockCognitoAuthResult,
-  createMockMqttClient,
+  createMockPlatformAccessory,
+  MockCharacteristics,
 } from '../mocks/index.js';
-
-// Store mock references
-let mockMqttClientInstance: ReturnType<typeof createMockMqttClient>;
-let mockAxiosInstance: ReturnType<typeof createMockAxios>;
-
-// Mock all external dependencies
-vi.mock('axios', () => ({
-  default: {
-    create: vi.fn(() => {
-      mockAxiosInstance = createMockAxios();
-      return mockAxiosInstance;
-    }),
-  },
-}));
-
-vi.mock('@aws-sdk/client-cognito-identity-provider', () => ({
-  CognitoIdentityProviderClient: vi.fn(() => ({
-    send: vi.fn().mockResolvedValue(mockCognitoAuthResult),
-  })),
-  InitiateAuthCommand: vi.fn(),
-  AuthFlowType: {
-    USER_PASSWORD_AUTH: 'USER_PASSWORD_AUTH',
-  },
-}));
-
-vi.mock('@aws-sdk/client-iot', () => ({
-  IoTClient: vi.fn(() => ({
-    send: vi.fn().mockRejectedValue(new Error('Not authorized')),
-  })),
-  DescribeEndpointCommand: vi.fn(),
-}));
-
-vi.mock('mqtt', () => ({
-  connect: vi.fn(() => {
-    mockMqttClientInstance = createMockMqttClient();
-    return mockMqttClientInstance;
-  }),
-}));
-
-// Import after mocks
+import { MaytronicsAPI } from '../../src/api/maytronicsApi.js';
+import { AuthError, ErrorCode } from '../../src/utils/errors.js';
 import { DolphinPoolCleanerPlatform } from '../../src/platform.js';
+import { PLATFORM_NAME, PLUGIN_NAME } from '../../src/config/constants.js';
+
+vi.mock('../../src/api/maytronicsApi.js', () => ({
+  MaytronicsAPI: vi.fn(),
+}));
+
+const ROBOT = {
+  serialNumber: 'E3086OFG2M',
+  name: 'Pool Bot',
+  model: 'Dolphin M400',
+  deviceType: 62,
+  features: [],
+};
+
+/** Fake cloud client with the surface the platform and devices use */
+const createCloud = () =>
+  Object.assign(new EventEmitter(), {
+    login: vi.fn().mockResolvedValue({ serialNumber: ROBOT.serialNumber, robotName: ROBOT.name }),
+    getRobots: vi.fn().mockResolvedValue([ROBOT]),
+    getThingShadow: vi.fn().mockResolvedValue(undefined),
+    getLastShadowReceivedAt: vi.fn().mockReturnValue(0),
+    disconnect: vi.fn(),
+  });
 
 describe('DolphinPoolCleanerPlatform', () => {
-  let platform: DolphinPoolCleanerPlatform;
   let mockLogger: ReturnType<typeof createMockLogger>;
-  let mockApi: ReturnType<typeof createMockAPI>;
+  let homebridge: ReturnType<typeof createMockAPI>;
+  let clouds: ReturnType<typeof createCloud>[];
+  let nextCloud: () => ReturnType<typeof createCloud>;
 
   const validConfig = {
     platform: 'DolphinPoolCleaner',
     name: 'Test Platform',
-    email: 'test@example.com',
-    password: 'password123',
+    refreshToken: 'refresh-token',
     pollingInterval: 60,
   };
 
-  beforeEach(() => {
-    mockLogger = createMockLogger();
-    mockApi = createMockAPI();
+  /** Fire a Homebridge lifecycle event the platform subscribed to */
+  const fire = (event: string) => {
+    const handler = vi.mocked(homebridge.on).mock.calls.find(([name]) => name === event)?.[1] as (() => void) | undefined;
+    handler?.();
+  };
 
-    // Setup axios mock responses
-    mockAxiosInstance = createMockAxios();
-    mockAxiosInstance.post.mockImplementation((url: string) => {
-      if (url.includes('login')) {
-        return Promise.resolve({ data: mockMaytronicsResponses.login });
-      }
-      if (url.includes('getListOfRobots')) {
-        return Promise.resolve({ data: mockMaytronicsResponses.getRobots });
-      }
-      if (url.includes('getAwsCredentials')) {
-        return Promise.resolve({ data: mockMaytronicsResponses.getAwsCredentials });
-      }
-      return Promise.reject(new Error('Unknown endpoint'));
+  const launch = async (config: Record<string, unknown> = validConfig, cached: unknown[] = []) => {
+    const platform = new DolphinPoolCleanerPlatform(mockLogger, config as never, homebridge);
+    cached.forEach((accessory) => platform.configureAccessory(accessory as never));
+    fire('didFinishLaunching');
+    await vi.advanceTimersByTimeAsync(0);
+    return platform;
+  };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    mockLogger = createMockLogger();
+    homebridge = createMockAPI();
+    Object.assign(homebridge.hap, {
+      Characteristic: { ...MockCharacteristics, ConfiguredName: { name: 'ConfiguredName' } },
+      Service: { ...homebridge.hap.Service, Valve: { name: 'Valve' } },
+    });
+    clouds = [];
+    nextCloud = createCloud;
+    // A regular function, so the platform can call it with `new`
+    // eslint-disable-next-line prefer-arrow-callback
+    vi.mocked(MaytronicsAPI).mockReset().mockImplementation(function () {
+      const cloud = nextCloud();
+      clouds.push(cloud);
+      return cloud as never;
     });
   });
 
   afterEach(() => {
-    vi.clearAllMocks();
-    if (platform) {
-      // Cleanup
-    }
+    fire('shutdown');
+    vi.useRealTimers();
   });
 
-  describe('constructor', () => {
-    it('should create platform with valid config', () => {
-      platform = new DolphinPoolCleanerPlatform(mockLogger, validConfig, mockApi);
+  describe('configuration', () => {
+    it('should refuse to start without a refresh token or email and password', async () => {
+      await launch({ platform: 'DolphinPoolCleaner', email: 'owner@example.com' });
 
-      expect(platform).toBeDefined();
+      expect(mockLogger.error).toHaveBeenCalledWith(expect.stringContaining('refreshToken or email/password'));
+      expect(MaytronicsAPI).not.toHaveBeenCalled();
     });
 
-    it('should log initialization message', () => {
-      platform = new DolphinPoolCleanerPlatform(mockLogger, validConfig, mockApi);
+    it('should accept email and password without a refresh token', async () => {
+      await launch({ platform: 'DolphinPoolCleaner', email: 'owner@example.com', password: 'secret' });
 
-      expect(mockLogger.debug).toHaveBeenCalledWith(
-        expect.stringContaining('Initializing'),
-        expect.anything(),
-      );
-    });
-  });
-
-  describe('configuration validation', () => {
-    it('should require email', () => {
-      const configWithoutEmail = { ...validConfig, email: undefined };
-
-      platform = new DolphinPoolCleanerPlatform(mockLogger, configWithoutEmail, mockApi);
-
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.stringContaining('email'),
-      );
+      expect(MaytronicsAPI).toHaveBeenCalledWith('owner@example.com', 'secret', mockLogger, undefined, undefined);
     });
 
-    it('should require password', () => {
-      const configWithoutPassword = { ...validConfig, password: undefined };
+    it('should clamp the polling interval to the minimum', async () => {
+      await launch({ ...validConfig, pollingInterval: 5 });
 
-      platform = new DolphinPoolCleanerPlatform(mockLogger, configWithoutPassword, mockApi);
-
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.stringContaining('password'),
-      );
-    });
-
-    it('should use default polling interval if not specified', () => {
-      const configWithoutPolling = { ...validConfig, pollingInterval: undefined };
-
-      platform = new DolphinPoolCleanerPlatform(mockLogger, configWithoutPolling, mockApi);
-
-      expect(platform).toBeDefined();
-    });
-
-    it('should enforce minimum polling interval', () => {
-      const configWithLowPolling = { ...validConfig, pollingInterval: 10 };
-
-      platform = new DolphinPoolCleanerPlatform(mockLogger, configWithLowPolling, mockApi);
-
-      // Should clamp to minimum
-      expect(platform).toBeDefined();
+      expect(mockLogger.debug).toHaveBeenCalledWith('Starting polling for Pool Bot every 30s');
     });
   });
 
-  describe('accessory caching', () => {
-    it('should configure cached accessories', () => {
-      platform = new DolphinPoolCleanerPlatform(mockLogger, validConfig, mockApi);
+  describe('discovery', () => {
+    it('should register a newly discovered robot and start its device', async () => {
+      await launch();
 
-      const mockAccessory = {
-        UUID: 'test-uuid',
-        displayName: 'Test Robot',
-        context: { serialNumber: 'TEST123' },
+      expect(homebridge.registerPlatformAccessories).toHaveBeenCalledWith(PLUGIN_NAME, PLATFORM_NAME, [
+        expect.objectContaining({ displayName: 'Pool Bot' }),
+      ]);
+      expect(clouds[0].getThingShadow).toHaveBeenCalledWith('E3086OFG2M');
+    });
+
+    it('should restore a cached accessory instead of registering it again', async () => {
+      const cached = createMockPlatformAccessory('Pool Bot', 'generated-uuid-E3086OFG2M');
+
+      await launch(validConfig, [cached]);
+
+      expect(homebridge.registerPlatformAccessories).not.toHaveBeenCalled();
+      expect(homebridge.updatePlatformAccessories).toHaveBeenCalledWith([cached]);
+    });
+
+    it('should apply the display name configured for the robot', async () => {
+      await launch({ ...validConfig, devices: [{ serialNumber: 'E3086OFG2M', name: 'Backyard Pool' }] });
+
+      expect(mockLogger.info).toHaveBeenCalledWith(expect.stringContaining('Device created: Backyard Pool'));
+    });
+
+    it('should remove cached accessories for robots that are gone', async () => {
+      const stale = createMockPlatformAccessory('Old Robot', 'generated-uuid-OLD');
+
+      await launch(validConfig, [stale]);
+
+      expect(homebridge.unregisterPlatformAccessories).toHaveBeenCalledWith(PLUGIN_NAME, PLATFORM_NAME, [stale]);
+    });
+  });
+
+  describe('retries', () => {
+    it('should retry discovery with backoff when the cloud is unreachable', async () => {
+      nextCloud = () => {
+        const cloud = createCloud();
+        if (clouds.length === 0) {
+          cloud.login.mockRejectedValue(new AuthError(ErrorCode.AUTH_COGNITO_FAILED, 'network down'));
+        }
+        return cloud;
+      };
+      const cached = createMockPlatformAccessory('Pool Bot', 'generated-uuid-E3086OFG2M');
+
+      await launch(validConfig, [cached]);
+      expect(homebridge.unregisterPlatformAccessories).not.toHaveBeenCalled();
+
+      await vi.advanceTimersByTimeAsync(30_000);
+
+      expect(clouds).toHaveLength(2);
+      expect(clouds[0].disconnect).toHaveBeenCalled();
+      expect(homebridge.updatePlatformAccessories).toHaveBeenCalledWith([cached]);
+    });
+
+    it('should back off exponentially', async () => {
+      nextCloud = () => {
+        const cloud = createCloud();
+        cloud.login.mockRejectedValue(new Error('network down'));
+        return cloud;
       };
 
-      // @ts-expect-error - accessing internal method
-      platform.configureAccessory(mockAccessory);
-
-      expect(mockLogger.info).toHaveBeenCalledWith(
-        expect.stringContaining('Restoring cached accessory'),
-        expect.anything(),
-      );
-    });
-  });
-});
-
-describe('Platform - Robot Discovery', () => {
-  let platform: DolphinPoolCleanerPlatform;
-  let mockLogger: ReturnType<typeof createMockLogger>;
-  let mockApi: ReturnType<typeof createMockAPI>;
-
-  const validConfig = {
-    platform: 'DolphinPoolCleaner',
-    name: 'Test Platform',
-    email: 'test@example.com',
-    password: 'password123',
-  };
-
-  beforeEach(() => {
-    mockLogger = createMockLogger();
-    mockApi = createMockAPI();
-
-    mockAxiosInstance = createMockAxios();
-    mockAxiosInstance.post.mockImplementation((url: string) => {
-      if (url.includes('login')) {
-        return Promise.resolve({ data: mockMaytronicsResponses.login });
-      }
-      if (url.includes('getListOfRobots')) {
-        return Promise.resolve({ data: mockMaytronicsResponses.getRobots });
-      }
-      if (url.includes('getAwsCredentials')) {
-        return Promise.resolve({ data: mockMaytronicsResponses.getAwsCredentials });
-      }
-      return Promise.reject(new Error('Unknown endpoint'));
+      await launch();
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(clouds).toHaveLength(2);
+      await vi.advanceTimersByTimeAsync(59_000);
+      expect(clouds).toHaveLength(2);
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(clouds).toHaveLength(3);
     });
 
-    platform = new DolphinPoolCleanerPlatform(mockLogger, validConfig, mockApi);
-  });
+    it('should not retry when the credentials are rejected', async () => {
+      nextCloud = () => {
+        const cloud = createCloud();
+        cloud.login.mockRejectedValue(new AuthError(ErrorCode.AUTH_TOKEN_EXPIRED, 'expired'));
+        return cloud;
+      };
 
-  afterEach(() => {
-    vi.clearAllMocks();
-  });
+      await launch();
+      await vi.advanceTimersByTimeAsync(15 * 60_000);
 
-  it('should discover robots after login', async () => {
-    // The platform should log discovered robots
-    // This is an integration test so we verify the flow works
-    expect(platform).toBeDefined();
-  });
-});
-
-describe('Platform - Error Handling', () => {
-  let mockLogger: ReturnType<typeof createMockLogger>;
-  let mockApi: ReturnType<typeof createMockAPI>;
-
-  beforeEach(() => {
-    mockLogger = createMockLogger();
-    mockApi = createMockAPI();
-  });
-
-  afterEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('should handle authentication failure gracefully', () => {
-    mockAxiosInstance = createMockAxios();
-    mockAxiosInstance.post.mockRejectedValue(new Error('Auth failed'));
-
-    const config = {
-      platform: 'DolphinPoolCleaner',
-      name: 'Test Platform',
-      email: 'test@example.com',
-      password: 'wrongpassword',
-    };
-
-    const platform = new DolphinPoolCleanerPlatform(mockLogger, config, mockApi);
-
-    expect(platform).toBeDefined();
-  });
-
-  it('should handle missing config', () => {
-    new DolphinPoolCleanerPlatform(mockLogger, {}, mockApi);
-
-    expect(mockLogger.error).toHaveBeenCalled();
-  });
-});
-
-describe('Platform - Accessory Management', () => {
-  let platform: DolphinPoolCleanerPlatform;
-  let mockLogger: ReturnType<typeof createMockLogger>;
-  let mockApi: ReturnType<typeof createMockAPI>;
-
-  const validConfig = {
-    platform: 'DolphinPoolCleaner',
-    name: 'Test Platform',
-    email: 'test@example.com',
-    password: 'password123',
-  };
-
-  beforeEach(() => {
-    mockLogger = createMockLogger();
-    mockApi = createMockAPI();
-
-    mockAxiosInstance = createMockAxios();
-    mockAxiosInstance.post.mockImplementation((url: string) => {
-      if (url.includes('login')) {
-        return Promise.resolve({ data: mockMaytronicsResponses.login });
-      }
-      if (url.includes('getListOfRobots')) {
-        return Promise.resolve({ data: mockMaytronicsResponses.getRobots });
-      }
-      if (url.includes('getAwsCredentials')) {
-        return Promise.resolve({ data: mockMaytronicsResponses.getAwsCredentials });
-      }
-      return Promise.reject(new Error('Unknown endpoint'));
-    });
-
-    platform = new DolphinPoolCleanerPlatform(mockLogger, validConfig, mockApi);
-  });
-
-  afterEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('should register new accessories', () => {
-    // Platform should register new accessories for discovered robots
-    expect(platform).toBeDefined();
-  });
-
-  it('should restore cached accessories', () => {
-    const cachedAccessory = {
-      UUID: 'cached-uuid',
-      displayName: 'Cached Robot',
-      context: { serialNumber: 'CACHED123' },
-    };
-
-    // @ts-expect-error - accessing internal method
-    platform.configureAccessory(cachedAccessory);
-
-    expect(mockLogger.info).toHaveBeenCalledWith(
-      expect.stringContaining('Restoring'),
-      expect.anything(),
-    );
-  });
-});
-
-describe('Platform - Lifecycle', () => {
-  let mockLogger: ReturnType<typeof createMockLogger>;
-  let mockApi: ReturnType<typeof createMockAPI>;
-
-  beforeEach(() => {
-    mockLogger = createMockLogger();
-    mockApi = createMockAPI();
-
-    mockAxiosInstance = createMockAxios();
-    mockAxiosInstance.post.mockImplementation((url: string) => {
-      if (url.includes('login')) {
-        return Promise.resolve({ data: mockMaytronicsResponses.login });
-      }
-      if (url.includes('getListOfRobots')) {
-        return Promise.resolve({ data: mockMaytronicsResponses.getRobots });
-      }
-      if (url.includes('getAwsCredentials')) {
-        return Promise.resolve({ data: mockMaytronicsResponses.getAwsCredentials });
-      }
-      return Promise.reject(new Error('Unknown endpoint'));
+      expect(clouds).toHaveLength(1);
+      expect(mockLogger.error).toHaveBeenCalledWith(expect.stringContaining('Not retrying'));
     });
   });
 
-  afterEach(() => {
-    vi.clearAllMocks();
-  });
+  describe('shutdown', () => {
+    it('should stop polling and close the cloud connection', async () => {
+      await launch();
+      const cloud = clouds[0];
 
-  it('should initialize without throwing', () => {
-    expect(() => {
-      new DolphinPoolCleanerPlatform(mockLogger, {
-        platform: 'DolphinPoolCleaner',
-        email: 'test@example.com',
-        password: 'test123',
-      }, mockApi);
-    }).not.toThrow();
-  });
+      fire('shutdown');
+      await vi.advanceTimersByTimeAsync(10 * 60_000);
 
-  it('should log platform name on init', () => {
-    new DolphinPoolCleanerPlatform(mockLogger, {
-      platform: 'DolphinPoolCleaner',
-      name: 'My Pool Cleaner',
-      email: 'test@example.com',
-      password: 'test123',
-    }, mockApi);
+      expect(cloud.disconnect).toHaveBeenCalled();
+      expect(cloud.listenerCount('shadowUpdate')).toBe(0);
+      expect(cloud.getThingShadow).toHaveBeenCalledTimes(1); // only the initial fetch
+    });
 
-    expect(mockLogger.debug).toHaveBeenCalled();
+    it('should cancel a pending discovery retry', async () => {
+      nextCloud = () => {
+        const cloud = createCloud();
+        cloud.login.mockRejectedValue(new Error('network down'));
+        return cloud;
+      };
+
+      await launch();
+      fire('shutdown');
+      await vi.advanceTimersByTimeAsync(10 * 60_000);
+
+      expect(clouds).toHaveLength(1);
+    });
   });
 });

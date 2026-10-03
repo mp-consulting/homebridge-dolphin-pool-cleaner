@@ -8,6 +8,9 @@ import type { DolphinPoolCleanerPlatform, DeviceConfig } from '../platform.js';
 import type { DolphinDevice, RobotState } from '../devices/dolphinDevice.js';
 import { COMMAND_GRACE_PERIOD_MS } from '../config/constants.js';
 
+// HAPStatus.SERVICE_COMMUNICATION_FAILURE (HAPStatus is a const enum, unusable with isolatedModules)
+const HAP_SERVICE_COMMUNICATION_FAILURE = -70402;
+
 export class DolphinAccessory {
   private readonly platform: DolphinPoolCleanerPlatform;
   private readonly accessory: PlatformAccessory;
@@ -17,6 +20,8 @@ export class DolphinAccessory {
   private readonly temperatureService?: Service;
   private readonly filterService?: Service;
   private lastCommandTime = 0;
+  private readonly onStateChange = (state: RobotState): void => this.handleStateChange(state);
+  private readonly onDisconnect = (): void => this.handleDisconnect();
 
   constructor(
     platform: DolphinPoolCleanerPlatform,
@@ -34,9 +39,17 @@ export class DolphinAccessory {
     this.temperatureService = this.setupTemperatureService();
     this.filterService = this.setupFilterService();
 
-    this.device.on('stateChange', this.handleStateChange.bind(this));
-    this.device.on('disconnect', this.handleDisconnect.bind(this));
+    this.device.on('stateChange', this.onStateChange);
+    this.device.on('disconnect', this.onDisconnect);
     this.platform.log.debug(`Accessory initialized: ${this.device.name}`);
+  }
+
+  /**
+   * Detach from the device (when the handler is replaced after re-discovery)
+   */
+  dispose(): void {
+    this.device.off('stateChange', this.onStateChange);
+    this.device.off('disconnect', this.onDisconnect);
   }
 
   /**
@@ -148,6 +161,10 @@ export class DolphinAccessory {
       );
     }
     // Update temperature if available
+    if (state.temperature !== undefined) {
+      // Remembered across restarts, so HomeKit can show the last reading
+      this.accessory.context.lastTemperature = state.temperature;
+    }
     if (this.temperatureService && state.temperature !== undefined) {
       this.temperatureService.updateCharacteristic(
         this.platform.Characteristic.CurrentTemperature,
@@ -224,9 +241,12 @@ export class DolphinAccessory {
   /**
    * Get water temperature
    */
-  async getTemperature() {
-    const state = this.device.getState();
-    const temp = state.temperature ?? 20; // Default to 20°C if not available
+  async getTemperature(): Promise<number> {
+    const temp: unknown = this.device.getState().temperature ?? this.accessory.context.lastTemperature;
+    if (typeof temp !== 'number') {
+      // No reading yet: report it rather than invent a temperature
+      throw new this.platform.homebridgeApi.hap.HapStatusError(HAP_SERVICE_COMMUNICATION_FAILURE);
+    }
     this.platform.log.debug(`Get Temperature: ${temp}°C`);
     return temp;
   }

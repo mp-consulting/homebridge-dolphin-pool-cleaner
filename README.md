@@ -77,7 +77,7 @@ Add to your Homebridge `config.json`:
         {
           "serialNumber": "ABC123XYZ",
           "name": "Pool Robot",
-          "cleaningMode": "regular",
+          "cleaningMode": "all",
           "enableTemperature": true,
           "enableFilterStatus": true
         }
@@ -92,9 +92,12 @@ Add to your Homebridge `config.json`:
 | Option | Required | Default | Description |
 |--------|----------|---------|-------------|
 | `platform` | Yes | - | Must be `DolphinPoolCleaner` |
-| `email` | Yes | - | MyDolphin Plus account email |
-| `password` | Yes | - | MyDolphin Plus account password |
+| `email` | No | - | MyDolphin Plus account email |
+| `password` | No* | - | MyDolphin Plus account password |
+| `refreshToken` | No* | - | Saved by the setup wizard; preferred over storing your password |
 | `pollingInterval` | No | 60 | Status poll interval in seconds (30-600) |
+
+\* Either `refreshToken` (set by the setup wizard) or `email` + `password` is required. The wizard is recommended: it never stores your password.
 
 ### Device Options
 
@@ -102,7 +105,7 @@ Add to your Homebridge `config.json`:
 |--------|----------|---------|-------------|
 | `serialNumber` | Yes | - | Robot serial number (on power supply label) |
 | `name` | No | Robot name | Display name in HomeKit |
-| `cleaningMode` | No | `regular` | Default cleaning mode |
+| `cleaningMode` | No | `all` | Default cleaning mode (`regular` is accepted as an alias of `all`) |
 | `enableTemperature` | No | `true` | Show water temperature sensor |
 | `enableFilterStatus` | No | `true` | Show filter maintenance indicator |
 
@@ -110,7 +113,7 @@ Add to your Homebridge `config.json`:
 
 | Mode | Duration | Description |
 |------|----------|-------------|
-| `regular` | 150 min | All surfaces - floor, walls, and waterline |
+| `all` | 150 min | All surfaces - floor, walls, and waterline |
 | `short` | 60 min | Quick clean for light debris |
 | `floor` | 150 min | Floor only |
 | `wall` | 120 min | Walls only |
