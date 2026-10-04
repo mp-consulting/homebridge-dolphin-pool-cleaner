@@ -54,12 +54,12 @@
   "dependencies": {
     "@aws-sdk/client-cognito-identity-provider": "^3.1127.0",
     "@homebridge/plugin-ui-utils": "^2.2.6",
-    "@mp-consulting/homebridge-ai-core": "file:../homebridge-mcp-server/packages/ai-core",
+    "@mp-consulting/homebridge-ai-core": "^2.0.0",
     "mqtt": "^5.15.2"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@mp-consulting/homebridge-ui-kit": "file:../homebridge-ui-kit",
+    "@mp-consulting/homebridge-ui-kit": "^1.2.0",
     "@types/node": "^26.5.0",
     "@vitest/coverage-v8": "^5.0.0",
     "bootstrap": "^5.3.8",
