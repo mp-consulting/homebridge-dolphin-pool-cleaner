@@ -54,7 +54,7 @@
   "dependencies": {
     "@aws-sdk/client-cognito-identity-provider": "^3.1127.0",
     "@homebridge/plugin-ui-utils": "^2.2.6",
-    "@mp-consulting/homebridge-ai-kit": "file:../homebridge-mcp-server",
+    "@mp-consulting/homebridge-ai-core": "file:../homebridge-mcp-server/packages/ai-core",
     "mqtt": "^5.15.2"
   },
   "devDependencies": {

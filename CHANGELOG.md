@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Assistant in the setup wizard.** When an AI provider is set up in Homebridge AI Kit (the shared `HomebridgeAiKit` platform block), an **Explain** button appears under a failed "Send Verification Code" step and a failed code verification. The explanation streams into an Assistant panel, with MyDolphin Plus context (Cognito CUSTOM_AUTH and its challenge types, the 5-minute code session, the wizard's error messages, refresh tokens, AWS IoT shadow and robot states). Only the error message and the wizard step are sent: never the email address (masked if it appears in an error), verification codes, tokens or serial numbers. Without the AI Kit nothing changes, apart from a small tip under the sign-in form.
-- `homebridge-ui/server.js` registers the `/ai/status`, `/ai/explain`, `/ai/ask` and `/ai/config` routes through `homebridge-ui/assistant.js` with `registerAiRoutes` from `@mp-consulting/homebridge-ai-kit/plugin` (new runtime dependency).
+- `homebridge-ui/server.js` registers the `/ai/status`, `/ai/explain`, `/ai/ask` and `/ai/config` routes through `homebridge-ui/assistant.js` with `registerAiRoutes` from `@mp-consulting/homebridge-ai-core/plugin` (new runtime dependency: the slim core of Homebridge AI Kit, so the plugin does not pull in the MCP SDK, socket.io or zod).
 
 ### Changed
 
@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Release blockers
 
-- `@mp-consulting/homebridge-ai-kit` (`file:../homebridge-mcp-server`) and `@mp-consulting/homebridge-ui-kit` (`file:../homebridge-ui-kit`) are local, unpublished checkouts. Change them to `^2.0.0` and `^1.2.0` once published, and regenerate `package-lock.json`.
+- `@mp-consulting/homebridge-ai-core` (`file:../homebridge-mcp-server/packages/ai-core`) and `@mp-consulting/homebridge-ui-kit` (`file:../homebridge-ui-kit`) are local, unpublished checkouts. Change them to `^2.0.0` and `^1.2.0` once published, and regenerate `package-lock.json`.
 
 ## [1.0.29] - 2026-10-03
 
