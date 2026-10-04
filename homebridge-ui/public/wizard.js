@@ -326,6 +326,8 @@
     // Clear errors when changing steps
     hideError(dom.loginError);
     hideError(dom.otpError);
+    clearExplain('login-problem');
+    clearExplain('otp-problem');
   }
 
   function setLoading(btn, loading) {
@@ -409,6 +411,97 @@
   }
 
   // ============================================================================
+  // Assistant (Homebridge AI Kit)
+  // ============================================================================
+  // Shown only when the shared HomebridgeAiKit platform is set up and enabled.
+  // Nothing sent to it may contain the email address, codes or tokens.
+
+  const assistant = { enabled: false, available: false };
+
+  async function initAssistant() {
+    try {
+      if (window.MpKit && MpKit.ai) {
+        const status = await MpKit.ai.status();
+        assistant.available = true;
+        assistant.enabled = !!(status && status.enabled);
+      }
+    } catch (_e) {
+      // Routes missing or older Homebridge UI: no Assistant
+    }
+    document.getElementById('assistant-hint')?.classList.toggle('d-none', !(assistant.available && !assistant.enabled));
+  }
+
+  // Error text without e-mail addresses
+  function scrubForAssistant(text) {
+    return String(text ?? '').replace(/[^\s@]+@[^\s@]+\.[^\s@]+/g, '<email>');
+  }
+
+  // Streams an explanation of `error` into `answerEl`
+  async function explainWithAssistant(button, answerEl, { error, context, title }) {
+    button.disabled = true;
+    button.setAttribute('aria-busy', 'true');
+    answerEl.classList.remove('d-none');
+    const answer = MpKit.ai.renderAnswer(answerEl, { title });
+    try {
+      const res = await MpKit.ai.explain({ error: scrubForAssistant(error), context }, { onChunk: answer.append });
+      answer.done(res);
+    } catch (e) {
+      answer.error(e);
+    } finally {
+      button.disabled = false;
+      button.removeAttribute('aria-busy');
+    }
+  }
+
+  // Adds an "Explain" button (and its answer panel) under an error the wizard shows
+  function offerExplain(slotId, { message, context, title }) {
+    const slot = document.getElementById(slotId);
+    if (!slot || !assistant.enabled) {
+      return;
+    }
+    slot.innerHTML = `
+      <div class="d-flex justify-content-end">
+        ${MpKit.ai.renderButton({ label: 'Explain', size: 'sm', className: 'js-explain', title: 'Explain this problem' })}
+      </div>
+      <div class="assistant-answer mt-2 d-none"></div>`;
+    slot.classList.remove('d-none');
+    const button = slot.querySelector('.js-explain');
+    button.addEventListener('click', () => explainWithAssistant(button, slot.querySelector('.assistant-answer'), {
+      error: message,
+      context,
+      title,
+    }));
+  }
+
+  function clearExplain(slotId) {
+    const slot = document.getElementById(slotId);
+    if (slot) {
+      slot.classList.add('d-none');
+      slot.innerHTML = '';
+    }
+  }
+
+  function showLoginProblem(message) {
+    showError(dom.loginError, message);
+    offerExplain('login-problem', {
+      message,
+      context: 'Step 1 of the Dolphin setup wizard: requesting a verification code for the MyDolphin Plus account '
+        + '(AWS Cognito CUSTOM_AUTH, InitiateAuth) failed.',
+      title: 'Why could the code not be sent?',
+    });
+  }
+
+  function showOtpProblem(message) {
+    showError(dom.otpError, message);
+    offerExplain('otp-problem', {
+      message,
+      context: 'Step 2 of the Dolphin setup wizard: verifying the code (AWS Cognito RespondToAuthChallenge, then the '
+        + 'MyDolphin authenticate-user call that returns the robot) failed. The code session lasts 5 minutes.',
+      title: 'Why did verification fail?',
+    });
+  }
+
+  // ============================================================================
   // Authentication Handlers
   // ============================================================================
 
@@ -432,6 +525,7 @@
   async function handleLogin(event) {
     event.preventDefault();
     hideError(dom.loginError);
+    clearExplain('login-problem');
 
     const email = dom.email.value.trim();
     if (!email) {
@@ -453,11 +547,11 @@
         dom.otpCode.focus();
         homebridge.toast.info('Verification code sent to your email');
       } else {
-        showError(dom.loginError, result.error || 'Authentication failed');
+        showLoginProblem(result.error || 'Authentication failed');
       }
     } catch (error) {
       console.error('Login error:', error);
-      showError(dom.loginError, error.message || 'Failed to connect. Please try again.');
+      showLoginProblem(error.message || 'Failed to connect. Please try again.');
     } finally {
       setLoading(dom.loginBtn, false);
     }
@@ -466,6 +560,7 @@
   async function handleOtpVerify(event) {
     event.preventDefault();
     hideError(dom.otpError);
+    clearExplain('otp-problem');
 
     const otpCode = dom.otpCode.value.trim();
     if (!otpCode) {
@@ -495,11 +590,11 @@
         dom.otpCode.value = '';
         dom.otpCode.focus();
       } else {
-        showError(dom.otpError, result.error || 'Verification failed');
+        showOtpProblem(result.error || 'Verification failed');
       }
     } catch (error) {
       console.error('OTP error:', error);
-      showError(dom.otpError, error.message || 'Failed to verify code. Please try again.');
+      showOtpProblem(error.message || 'Failed to verify code. Please try again.');
     } finally {
       setLoading(dom.otpBtn, false);
     }
@@ -841,6 +936,7 @@
       document.documentElement.dataset.bsTheme = settings.colorScheme === 'dark' ? 'dark' : 'light';
     }).catch(() => {});
     loadSavedConfig();
+    initAssistant();
 
     // Initialize cleaning mode info
     if (dom.cleaningMode) {

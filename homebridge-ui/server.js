@@ -6,6 +6,7 @@
  */
 import { createRequire } from 'module';
 import { COGNITO, MAYTRONICS_API } from '../dist/config/constants.js';
+import { registerAssistant } from './assistant.js';
 
 const require = createRequire(import.meta.url);
 const { HomebridgePluginUiServer } = require('@homebridge/plugin-ui-utils');
@@ -273,6 +274,9 @@ class DolphinUiServer extends HomebridgePluginUiServer {
     // Register request handlers
     this.onRequest('/authenticate', this.handleAuthenticate.bind(this));
     this.onRequest('/verify-otp', this.handleVerifyOtp.bind(this));
+
+    // Assistant: /ai/status, /ai/explain, /ai/ask, /ai/config (configured in Homebridge AI Kit)
+    registerAssistant(this);
 
     this.ready();
   }

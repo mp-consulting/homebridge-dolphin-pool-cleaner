@@ -53,6 +53,8 @@
         </div>
 
         <div id="login-error" class="alert alert-danger" style="display: none;"></div>
+        <!-- Assistant: explain the login error (filled by wizard.js) -->
+        <div id="login-problem" class="mb-3 d-none"></div>
 
         <div class="wizard-actions d-flex gap-2 mt-3">
           <button type="button" class="btn btn-secondary flex-fill d-none" id="cancel-add-robot-btn">Cancel</button>
@@ -62,6 +64,11 @@
           </button>
         </div>
       </form>
+
+      <p id="assistant-hint" class="small text-muted mt-3 mb-0 d-none">
+        Tip: install and enable <strong>Homebridge AI Kit</strong> to get the Assistant,
+        which explains sign-in errors here.
+      </p>
     </div>
 
     <!-- Step 1b: OTP Verification -->
@@ -81,6 +88,8 @@
         </div>
 
         <div id="otp-error" class="alert alert-danger" style="display: none;"></div>
+        <!-- Assistant: explain the verification error (filled by wizard.js) -->
+        <div id="otp-problem" class="mb-3 d-none"></div>
 
         <div class="wizard-actions d-flex gap-2 mt-3">
           <button type="button" class="btn btn-secondary flex-fill" id="otp-back-btn">Back</button>

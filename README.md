@@ -17,6 +17,7 @@ Control your Maytronics Dolphin pool cleaning robot through Apple HomeKit using 
 - **Multiple Cleaning Modes** - Choose from 8 cleaning modes
 - **Real-time Updates** - Instant status via AWS IoT MQTT
 - **OTP/MFA Support** - Full two-factor authentication support
+- **Assistant (optional)** - Explains sign-in and verification errors in the setup wizard, using the AI provider you set up in Homebridge AI Kit
 - **Siri Integration** - "Hey Siri, start pool cleaning"
 
 ## Supported Models
@@ -183,6 +184,27 @@ The filter indicator is based on the `filterBagIndication.state` value (0-100%).
 
 Water temperature is only available when the robot is actively in the water and its sensors are submerged.
 
+## Assistant
+
+The setup wizard can explain sign-in problems with the **Assistant**. It is off until
+you set up an AI provider once for all MP Consulting plugins in
+[Homebridge AI Kit](https://github.com/mp-consulting/homebridge-ai-kit) (or the
+Homebridge Glass UI): the plugin reads the shared `HomebridgeAiKit` platform block from
+`config.json` and has no AI settings of its own. When it is not set up, the wizard looks
+exactly as before, with a small tip under the sign-in form.
+
+When it is enabled, an **Explain** button appears under a failed "Send Verification
+Code" step and a failed code verification; the answer streams into an Assistant panel
+below.
+
+What is sent to the provider: the error message and which wizard step failed. Your
+email address (also masked if it appears in an error), verification codes, refresh
+token and robot serial number are never sent, and the provider's API key stays on the
+Homebridge server.
+
+The wizard has no "Describe Your Setup" helper: the configuration is mostly the
+`devices` list that the wizard itself fills in after sign-in.
+
 ## Security
 
 - All user-facing HTML output is sanitized to prevent XSS
@@ -224,6 +246,12 @@ npm link
 # Run with auto-reload
 npm run watch
 ```
+
+The build copies `@mp-consulting/homebridge-ui-kit` (and Bootstrap's CSS) into
+`homebridge-ui/public/lib/` with `mp-ui-kit-copy`. Until
+`@mp-consulting/homebridge-ai-kit` 2.0.0 and `@mp-consulting/homebridge-ui-kit` 1.2.0
+are published, both are installed from sibling checkouts (`file:../homebridge-mcp-server`
+and `file:../homebridge-ui-kit`); they must become `^2.0.0` and `^1.2.0` before release.
 
 ### Project Structure
 

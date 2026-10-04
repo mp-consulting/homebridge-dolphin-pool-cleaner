@@ -1,14 +1,14 @@
 {
   "name": "@mp-consulting/homebridge-dolphin-pool-cleaner",
   "displayName": "Dolphin Pool Cleaner",
-  "version": "1.0.29",
+  "version": "1.1.0",
   "description": "Homebridge plugin for MyDolphin Plus pool cleaning robots (Maytronics)",
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
     "lint": "eslint . --max-warnings=0",
     "watch": "npm run build && npm link && nodemon",
-    "copy:ui-kit": "mkdir -p homebridge-ui/public/lib && cp node_modules/@mp-consulting/homebridge-ui-kit/dist/kit.css homebridge-ui/public/lib/ && cp node_modules/@mp-consulting/homebridge-ui-kit/dist/kit.js homebridge-ui/public/lib/ && cp node_modules/bootstrap/dist/css/bootstrap.min.css homebridge-ui/public/lib/",
+    "copy:ui-kit": "mp-ui-kit-copy && cp node_modules/bootstrap/dist/css/bootstrap.min.css homebridge-ui/public/lib/",
     "build": "npm run copy:ui-kit && rimraf ./dist && tsc",
     "prepublishOnly": "npm run lint && npm run build",
     "test": "vitest run",
@@ -54,11 +54,12 @@
   "dependencies": {
     "@aws-sdk/client-cognito-identity-provider": "^3.1127.0",
     "@homebridge/plugin-ui-utils": "^2.2.6",
+    "@mp-consulting/homebridge-ai-kit": "file:../homebridge-mcp-server",
     "mqtt": "^5.15.2"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@mp-consulting/homebridge-ui-kit": "^1.1.0",
+    "@mp-consulting/homebridge-ui-kit": "file:../homebridge-ui-kit",
     "@types/node": "^26.5.0",
     "@vitest/coverage-v8": "^5.0.0",
     "bootstrap": "^5.3.8",

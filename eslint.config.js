@@ -78,7 +78,7 @@ export default tseslint.config(
   },
   // homebridge-ui server globals
   {
-    files: ['homebridge-ui/server.js'],
+    files: ['homebridge-ui/server.js', 'homebridge-ui/assistant.js'],
     languageOptions: {
       globals: {
         console: 'readonly',

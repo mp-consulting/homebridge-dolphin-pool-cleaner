@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - 1.1.0
+
+### Added
+
+- **Assistant in the setup wizard.** When an AI provider is set up in Homebridge AI Kit (the shared `HomebridgeAiKit` platform block), an **Explain** button appears under a failed "Send Verification Code" step and a failed code verification. The explanation streams into an Assistant panel, with MyDolphin Plus context (Cognito CUSTOM_AUTH and its challenge types, the 5-minute code session, the wizard's error messages, refresh tokens, AWS IoT shadow and robot states). Only the error message and the wizard step are sent: never the email address (masked if it appears in an error), verification codes, tokens or serial numbers. Without the AI Kit nothing changes, apart from a small tip under the sign-in form.
+- `homebridge-ui/server.js` registers the `/ai/status`, `/ai/explain`, `/ai/ask` and `/ai/config` routes through `homebridge-ui/assistant.js` with `registerAiRoutes` from `@mp-consulting/homebridge-ai-kit/plugin` (new runtime dependency).
+
+### Changed
+
+- **UI kit assets are copied with `mp-ui-kit-copy`** from `@mp-consulting/homebridge-ui-kit` 1.2.0 (Bootstrap's CSS is still copied next to it); `homebridge-ui/public/lib/` keeps the same layout and now also contains `ai.css`.
+
+### Release blockers
+
+- `@mp-consulting/homebridge-ai-kit` (`file:../homebridge-mcp-server`) and `@mp-consulting/homebridge-ui-kit` (`file:../homebridge-ui-kit`) are local, unpublished checkouts. Change them to `^2.0.0` and `^1.2.0` once published, and regenerate `package-lock.json`.
+
 ## [1.0.29] - 2026-10-03
 
 ### Changed
