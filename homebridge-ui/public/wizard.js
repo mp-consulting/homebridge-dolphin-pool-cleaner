@@ -115,9 +115,7 @@
     <ellipse cx="100" cy="75" rx="55" ry="25" fill="url(#topGradient)"/>
     <path d="M70 55 Q100 35 130 55" stroke="#3A80C9" stroke-width="6" fill="none" stroke-linecap="round"/>
     <path d="M55 90 Q100 100 145 90" stroke="#3A80C9" stroke-width="2" fill="none"/>
-    <circle cx="100" cy="75" r="6" fill="#4ADE80">
-      <animate attributeName="opacity" values="1;0.5;1" dur="2s" repeatCount="indefinite"/>
-    </circle>
+    <circle cx="100" cy="75" r="6" fill="#4ADE80"/>
     <path d="M60 100 L60 125" stroke="#5BA0E9" stroke-width="3"/>
     <path d="M75 95 L75 130" stroke="#5BA0E9" stroke-width="3"/>
     <path d="M125 95 L125 130" stroke="#5BA0E9" stroke-width="3"/>
