@@ -16,16 +16,16 @@
 
 .wizard-step {
   display: none;
-  animation: fadeIn 0.3s ease-in-out;
+  animation: stepIn 200ms cubic-bezier(0.23, 1, 0.32, 1);
 }
 
 .wizard-step.active {
   display: block;
 }
 
-@keyframes fadeIn {
-  from { transform: translateY(8px); }
-  to { transform: translateY(0); }
+@keyframes stepIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 /* Step Header */
@@ -207,7 +207,7 @@
 /* Clickable robot card — horizontal layout (image left, details right) */
 .robot-card-clickable {
   cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1), box-shadow 200ms ease;
   display: flex;
   align-items: stretch;
 }
@@ -243,10 +243,14 @@
   [data-bs-theme="dark"] .robot-card-clickable:hover {
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
   }
+
+  .robot-card-clickable:hover:active {
+    transform: translateY(-2px) scale(0.98);
+  }
 }
 
 .robot-card-clickable:active {
-  transform: scale(0.99);
+  transform: scale(0.98);
 }
 
 .robot-card-clickable:focus-visible {
@@ -437,4 +441,25 @@ svg.bi {
   display: inline-block;
   vertical-align: -0.125em;
   fill: currentColor;
+}
+
+/* Reduced motion: keep fades, drop movement */
+@keyframes stepFade {
+  from { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wizard-step {
+    animation: stepFade 150ms ease-out;
+  }
+
+  .robot-card-clickable {
+    transition: box-shadow 200ms ease;
+  }
+
+  .robot-card-clickable:hover,
+  .robot-card-clickable:active,
+  .robot-card-clickable:hover:active {
+    transform: none;
+  }
 }
